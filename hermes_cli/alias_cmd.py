@@ -1,17 +1,16 @@
 """Interactive Model Alias Manager for Hermes Agent.
 
 Provides an all-in-one dashboard to view, create, and delete model aliases
-via the interactive terminal UI (using prompt_toolkit / questionary style choices).
+via the native curses/prompt_toolkit UI (zero external dependencies).
 """
 
 from __future__ import annotations
 
 import os
-from typing import Optional, List, Tuple
-from prompt_toolkit.shortcuts import radiolist_dialog, input_dialog, message_dialog
+from typing import Optional, List, Dict, Any
 
-from hermes_cli.config import load_config, load_config_readonly
-from hermes_cli.model_switch import _load_direct_aliases, DirectAlias
+from hermes_cli.config import load_config, load_config_readonly, save_config
+from hermes_cli.curses_ui import curses_radiolist
 
 
 def get_all_model_aliases() -> dict[str, dict[str, str]]:
@@ -62,8 +61,6 @@ def save_model_alias(name: str, model: str, provider: str = "custom", base_url: 
         "provider": provider.strip() if provider else "custom",
         "base_url": base_url.strip() if base_url else "",
     }
-    
-    from hermes_cli.config import save_config
     save_config(cfg)
 
 
@@ -84,62 +81,60 @@ def delete_model_alias(name: str) -> None:
             modified = True
             
     if modified:
-        from hermes_cli.config import save_config
         save_config(cfg)
 
 
 def interactive_alias_dashboard(args=None) -> None:
     """All-in-one dashboard: [+ Create New Alias] and all existing model aliases."""
-    import questionary
-    from questionary import Choice
     from hermes_cli.main import select_provider_and_model
 
     while True:
         aliases = get_all_model_aliases()
         
-        choices = [
-            Choice(title="➕ [+ Create New Alias]", value="__CREATE__"),
-            Choice(title="─────────────────────────────────────────────", value=None, disabled=True),
-        ]
+        items = ["➕ [+ Create New Alias]"]
+        alias_keys = [None]  # Index 0 is Create
         
-        if not aliases:
-            choices.append(Choice(title="  (No model aliases defined yet)", value=None, disabled=True))
-        else:
+        if aliases:
             for name, data in sorted(aliases.items()):
                 prov_label = f" ({data['provider']})" if data.get('provider') else ""
                 url_label = f" @ {data['base_url']}" if data.get('base_url') else ""
-                title = f"• {name:<12} -> {data['model']}{prov_label}{url_label}"
-                choices.append(Choice(title=title, value=name))
-                
-        choices.append(Choice(title="─────────────────────────────────────────────", value=None, disabled=True))
-        choices.append(Choice(title="❌ Exit", value="__EXIT__"))
+                items.append(f"• {name:<12} -> {data['model']}{prov_label}{url_label}")
+                alias_keys.append(name)
+        else:
+            items.append("  (No aliases yet — press ➕ to create one)")
+            alias_keys.append(None)
+            
+        items.append("❌ Exit")
+        alias_keys.append("__EXIT__")
 
-        selected = questionary.select(
-            "⚡ Model Aliases Dashboard:",
-            choices=choices,
-            use_indicator=True,
-        ).ask()
+        sel_idx = curses_radiolist(
+            title="⚡ Model Aliases Dashboard (Enter: Select | ESC/q: Exit)",
+            items=items,
+            selected=0,
+            cancel_returns=len(items) - 1,
+        )
 
-        if selected is None or selected == "__EXIT__":
+        chosen_key = alias_keys[sel_idx]
+
+        if chosen_key == "__EXIT__" or sel_idx == len(items) - 1:
             break
 
-        if selected == "__CREATE__":
-            # 1. Ask for alias name
-            alias_name = questionary.text(
-                "Enter alias name (e.g. 'mimo', 'flash', 'sonnet'):",
-                validate=lambda text: True if text.strip() else "Alias name cannot be empty.",
-            ).ask()
+        if chosen_key is None and sel_idx == 0:
+            # 1. Ask for alias name via clean terminal input
+            print("\n" + "=" * 50)
+            try:
+                alias_name = input("Enter new alias name (e.g. 'mimo', 'flash', 'sonnet') [or Enter to cancel]: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                alias_name = ""
 
-            if not alias_name or not alias_name.strip():
+            if not alias_name:
                 continue
 
-            alias_name = alias_name.strip().lower()
-
-            print(f"\n👉 Pick provider and model for alias '{alias_name}' below:\n")
+            alias_name = alias_name.lower()
+            print(f"\n👉 Pick provider and model for alias '{alias_name}' below...\n")
             
             # 2. Pick provider and model using existing hermes model picker logic
             try:
-                # Capture current model/provider before selection
                 cfg_before = load_config()
                 select_provider_and_model(args=args)
                 cfg_after = load_config()
@@ -150,10 +145,8 @@ def interactive_alias_dashboard(args=None) -> None:
                 new_prov = model_cfg.get("provider", "custom") if isinstance(model_cfg, dict) else "custom"
                 new_base_url = model_cfg.get("base_url", "") if isinstance(model_cfg, dict) else ""
 
-                # Revert model: default in config so we don't accidentally override the user's active session model
-                # unless they intentionally set it
+                # Revert model default in config so we don't accidentally override the active session model
                 cfg_after["model"] = cfg_before.get("model", {})
-                from hermes_cli.config import save_config
                 save_config(cfg_after)
 
                 if new_model:
@@ -162,18 +155,15 @@ def interactive_alias_dashboard(args=None) -> None:
             except Exception as e:
                 print(f"\n❌ Failed to create alias: {e}\n")
 
-        else:
-            # Manage existing alias (Delete / View)
-            action = questionary.select(
-                f"Action for alias '{selected}':",
-                choices=[
-                    Choice(title="🗑️  Delete Alias", value="delete"),
-                    Choice(title="← Back", value="back"),
-                ],
-            ).ask()
-
-            if action == "delete":
-                confirm = questionary.confirm(f"Are you sure you want to delete alias '{selected}'?").ask()
-                if confirm:
-                    delete_model_alias(selected)
-                    print(f"✓ Deleted alias '{selected}'.")
+        elif chosen_key is not None:
+            # Manage existing alias (Delete / Back)
+            action_items = [f"🗑️  Delete Alias '{chosen_key}'", "← Back"]
+            act_idx = curses_radiolist(
+                title=f"Manage Alias: {chosen_key}",
+                items=action_items,
+                selected=0,
+                cancel_returns=1,
+            )
+            if act_idx == 0:
+                delete_model_alias(chosen_key)
+                print(f"✓ Deleted alias '{chosen_key}'.")
