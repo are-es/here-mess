@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Here-Mess Fork Knowledge Graph</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0f172a; color: #f8fafc; padding: 24px; }
+        h1 { color: #38bdf8; }
+        .badge { background: #1e293b; border: 1px solid #334155; padding: 8px 12px; border-radius: 6px; display: inline-block; margin: 4px; }
+        .count { color: #4ade80; font-weight: bold; }
+        pre { background: #1e293b; padding: 16px; border-radius: 8px; overflow-x: auto; color: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <h1>⚡ Here-Mess Fork Knowledge Graph</h1>
+    <div class="badge">Total Nodes: <span class="count">627</span></div>
+    <div class="badge">Total Relations: <span class="count">620</span></div>
+    <h2>Tracked Architecture AST Nodes</h2>
+    <pre>[
+  {
+    "id": "file:hermes_cli/alias_cmd.py",
+    "type": "file",
+    "name": "hermes_cli/alias_cmd.py",
+    "path": "hermes_cli/alias_cmd.py"
+  },
+  {
+    "id": "func:hermes_cli/alias_cmd.py:get_all_model_aliases",
+    "type": "function",
+    "name": "get_all_model_aliases",
+    "file": "hermes_cli/alias_cmd.py",
+    "line": 16
+  },
+  {
+    "id": "func:hermes_cli/alias_cmd.py:save_model_alias",
+    "type": "function",
+    "name": "save_model_alias",
+    "file": "hermes_cli/alias_cmd.py",
+    "line": 53
+  },
+  {
+    "id": "func:hermes_cli/alias_cmd.py:delete_model_alias",
+    "type": "function",
+    "name": "delete_model_alias",
+    "file": "hermes_cli/alias_cmd.py",
+    "line": 67
+  },
+  {
+    "id": "func:hermes_cli/alias_cmd.py:interactive_alias_dashboard",
+    "type": "function",
+    "name": "interactive_alias_dashboard",
+    "file": "hermes_cli/alias_cmd.py",
+    "line": 87
+  },
+  {
+    "id": "file:hermes_cli/subcommands/model.py",
+    "type": "file",
+    "name": "hermes_cli/subcommands/model.py",
+    "path": "hermes_cli/subcommands/model.py"
+  },
+  {
+    "id": "func:hermes_cli/subcommands/model.py:build_model_parser",
+    "type": "function",
+    "name": "build_model_parser",
+    "file": "hermes_cli/subcommands/model.py",
+    "line": 12
+  },
+  {
+    "id": "func:hermes_cli/subcommands/model.py:_dispatch_alias_dashboard",
+    "type": "function",
+    "name": "_dispatch_alias_dashboard",
+    "file": "hermes_cli/subcommands/model.py",
+    "line": 82
+  },
+  {
+    "id": "file:hermes_cli/relaunch.py",
+    "type": "file",
+    "name": "hermes_cli/relaunch.py",
+    "path": "hermes_cli/relaunch.py"
+  },
+  {
+    "id": "func:hermes_cli/relaunch.py:_build_inherited_flag_table",
+    "type": "function",
+    "name": "_build_inherited_flag_table",
+    "file": "hermes_cli/relaunch.py",
+    "line": 23
+  },
+  {
+    "id": "func:hermes_cli/relaunch.py:_extract_inherited_flags",
+    "type": "function",
+    "name": "_extract_inherited_flags",
+    "file": "hermes_cli/relaunch.py",
+    "line": 55
+  },
+  {
+    "id": "func:hermes_cli/relaunch.py:resolve_hermes_bin",
+    "type": "function",
+    "name": "resolve_hermes_bin",
+    "file": "hermes_cli/relaunch.py",
+    "line": 81
+  },
+  {
+    "id": "func:hermes_cli/relaunch.py:build_relaunch_argv",
+    "type": "function",
+    "name": "build_relaunch_argv",
+    "file": "hermes_cli/relaunch.py",
+    "line": 120
+  },
+  {
+    "id": "func:hermes_cli/relaunch.py:relaunch",
+    "type": "function",
+    "name": "relaunch",
+    "file": "hermes_cli/relaunch.py",
+    "line": 151
+  },
+  {
+    "id": "file:hermes_cli/config.py",
+    "type": "file",
+    "name": "hermes_cli/config.py",
+    "path": "hermes_cli/config.py"
+  },
+  {
+    "id": "func:hermes_cli/config.py:_backup_corrupt_config",
+    "type": "function",
+    "name": "_backup_corrupt_config",
+    "file": "hermes_cli/config.py",
+    "line": 46
+  },
+  {
+    "id": "func:hermes_cli/config.py:_warn_config_parse_failure",
+    "type": "function",
+    "name": "_warn_config_parse_failure",
+    "file": "hermes_cli/config.py",
+    "line": 100
+  },
+  {
+    "id": "func:hermes_cli/config.py:_reject_denylisted_env_var",
+    "type": "function",
+    "name": "_reject_denylisted_env_var",
+    "file": "hermes_cli/config.py",
+    "line": 220
+  },
+  {
+    "id": "func:hermes_cli/config.py:get_managed_system",
+    "type": "function",
+    "name": "get_managed_system",
+    "file": "hermes_cli/config.py",
+    "line": 357
+  },
+  {
+    "id": "func:hermes_cli/config.py:is_managed",
+    "type": "function",
+    "name": "is_managed",
+    "file": "hermes_cli/config.py",
+    "line": 374
+  },
+  {
+    "id": "func:hermes_cli/config.py:get_managed_update_command",
+    "type": "function",
+    "name": "get_managed_update_command",
+    "file": "hermes_cli/config.py",
+    "line": 390
+  },
+  {
+    "id": "func:hermes_cli/config.py:_install_method_project_root",
+    "type": "function",
+    "name": "_install_method_project_root",
+    "file": "hermes_cli/config.py",
+    "line": 398
+  },
+  {
+    "id": "func:hermes_cli/config.py:detect_install_method",
+    "type": "function",
+    "name": "detect_install_method",
+    "file": "hermes_cli/config.py",
+    "line": 412
+  },
+  {
+    "id": "func:hermes_cli/config.py:_running_in_container",
+    "type": "function",
+    "name": "_running_in_container",
+    "file": "hermes_cli/config.py",
+    "line": 514
+  },
+  {
+    "id": "func:hermes_cli/config.py:stamp_install_method",
+    "type": "function",
+    "name": "stamp_install_method",
+    "file": "hermes_cli/config.py",
+    "line": 524
+  }
+]</pre>
+</body>
+</html>
