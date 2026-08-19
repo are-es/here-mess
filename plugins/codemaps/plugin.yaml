@@ -1,0 +1,8 @@
+name: codemaps
+version: 1.0.0
+description: "Codebase architecture mapping, balloon graph visualization, and persistent project memory."
+author: are-es
+tools:
+  - name: code_maps
+    description: "Discover project architecture, AST dependencies, symbol connections, and project memory. Actions: 'scan' (discover or build maps), 'update' (incremental diff sync), 'query' (ask relations between files/functions), 'memory_save' (record technical gotchas)."
+    handler: tools:handle_codemaps
