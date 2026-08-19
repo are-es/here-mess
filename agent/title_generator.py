@@ -72,20 +72,20 @@ MAX_DERIVED_TITLE_CHARS = 48
 _MAX_TITLE_WORDS = 12
 
 _TITLE_PROMPT_TEMPLATE = (
-    "You name chat sessions. Given the user's opening message, write a title "
+    "You name chat sessions. Given the user's message context, write a concise, specific title "
     "that lets them find this conversation again in a list.\n\n"
     "Rules:\n"
     "- 3 to 7 words, sentence case (capitalize only the first word and proper nouns).\n"
-    "- Name what the user wants DONE, not that they asked a question.\n"
+    "- Focus on the core technical task, topic, problem, or project goal being discussed.\n"
+    "- Never generate generic greeting titles like 'Friendly greeting', 'Casual conversation', or 'Sapaan ramah'. If the message is only a greeting, name it 'New Workspace Session'.\n"
     "- Keep technical terms, filenames, numbers, and error codes exact.\n"
     "- Drop filler words: the, this, my, a, an.\n"
     "- No trailing punctuation, no quotes, no tool names, no 'Title:' prefix.\n"
     "- Never answer the message. Name it.\n"
-    "- Always produce something, even for a bare greeting.\n"
     "__LANGUAGE_RULE__\n"
     'Good: {"title": "Fix login button on mobile"}\n'
     'Good: {"title": "Postgres connection pool exhaustion"}\n'
-    'Good: {"title": "Friendly greeting"}\n'
+    'Good: {"title": "New Workspace Session"}\n'
     'Too vague: {"title": "Code changes"}\n'
     'Too long: {"title": "Investigate and fix the issue where the login button '
     'does not respond on mobile devices"}\n\n'
@@ -242,17 +242,14 @@ def _summarize_user_message(user_message: str) -> str:
 
 
 def is_titleable_user_message(user_message: str) -> bool:
-    """Return whether *user_message* carries real user intent to title from.
-
-    False for machine-authored openers (compaction handoffs, runtime notes) and
-    for turns that reduce to nothing once control scaffolding is stripped.
-    """
+    """Return whether *user_message* carries real user intent to title from."""
     if not isinstance(user_message, str) or not user_message.strip():
         return False
     for prefix in _MACHINE_PREFIXES:
         if user_message.lstrip().startswith(prefix):
             return False
-    return bool(_summarize_user_message(user_message).strip())
+    clean = _summarize_user_message(user_message).strip().lower()
+    return bool(clean)
 
 
 def derive_title(user_message: str) -> Optional[str]:
@@ -723,15 +720,6 @@ def maybe_auto_title(
         return
 
     # Count the real questions behind us to detect the opening turn.
-    # ``conversation_history`` is the state BEFORE this turn's message is
-    # appended when called from the turn prologue, and after it when called
-    # post-response, so accept both.
-    #
-    # Two things have to be true to skip: we are past the opening turn AND the
-    # session already has a name. Either alone gets it wrong. The count alone
-    # left a session that opened with machinery permanently nameless, because
-    # nothing reconsidered it. The title alone would never title at all on a
-    # store too old to report one.
     user_msg_count = sum(1 for m in (conversation_history or []) if _is_real_user_turn(m))
     if user_msg_count > 1 and not _session_is_untitled(session_db, session_id):
         return

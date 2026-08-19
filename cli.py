@@ -1393,6 +1393,16 @@ def _reset_terminal_input_modes_on_exit() -> None:
     # Prefer stdout when it's the terminal; otherwise the TUI may have driven
     # /dev/tty while stdout was redirected — reset there instead of nowhere.
     try:
+        if sys.platform != "win32":
+            import subprocess
+            try:
+                subprocess.run(["stty", "sane", "echo", "icanon"], capture_output=True, timeout=0.5)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
         stream = sys.stdout
         if stream is not None and stream.isatty():
             stream.write(_TERMINAL_INPUT_MODE_RESET_SEQ)
