@@ -34,19 +34,19 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
     <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         :root {{
-            --bg-color: #050811;
-            --surface-color: #0b1120;
-            --surface-border: rgba(255, 255, 255, 0.08);
+            --bg-color: #08080a;
+            --surface-color: rgba(14, 14, 18, 0.85);
+            --surface-border: rgba(255, 255, 255, 0.07);
             --accent-file: #38bdf8;
             --accent-func: #34d399;
             --accent-class: #a855f7;
-            --text-main: #f8fafc;
-            --text-dim: #94a3b8;
+            --text-main: #f4f4f5;
+            --text-dim: #71717a;
         }}
 
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg-color);
+            background: #08080a;
             color: var(--text-main);
             overflow: hidden;
             width: 100vw;
@@ -57,12 +57,14 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
         #sidebar {{
             width: 380px;
             background: var(--surface-color);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
             border-right: 1px solid var(--surface-border);
             display: flex;
             flex-direction: column;
             padding: 24px;
             z-index: 10;
-            box-shadow: 12px 0 32px rgba(0, 0, 0, 0.6);
+            box-shadow: 16px 0 40px rgba(0, 0, 0, 0.85);
         }}
 
         .brand-header {{
@@ -139,15 +141,21 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
         #network-container {{
             flex: 1;
             height: 100%;
-            background: radial-gradient(circle at center, #0f172a 0%, #02040a 100%);
+            background-color: #060608;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(24, 24, 27, 0.6) 0%, rgba(6, 6, 8, 0.95) 75%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 32px 32px, 32px 32px;
         }}
 
         .hud-legend {{
             position: absolute;
             top: 24px;
             left: 404px;
-            background: rgba(15, 23, 42, 0.85);
-            backdrop-filter: blur(12px);
+            background: rgba(14, 14, 18, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border: 1px solid var(--surface-border);
             padding: 10px 20px;
             border-radius: 30px;
@@ -156,6 +164,7 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
             gap: 20px;
             pointer-events: none;
             z-index: 5;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
         }}
         .legend-item {{ display: flex; align-items: center; gap: 8px; font-weight: 500; }}
         .legend-ball {{
