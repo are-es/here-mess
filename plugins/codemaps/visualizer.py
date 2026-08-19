@@ -1,4 +1,4 @@
-"""Full Vis.js Network Interactive Visualizer Generator for Code-Maps."""
+"""Full Vis.js Network Interactive Visualizer Generator for Code-Maps (with Live Auto-Sync)."""
 
 import json
 from pathlib import Path
@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 
 def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
-    """Generate high-definition Vis.js Sphere Balloon graph with full zoom, pan, and dragging."""
+    """Generate high-definition Vis.js Sphere Balloon graph with full zoom, pan, dragging, and live auto-reload."""
     nodes = graph_data.get("nodes", [])
     edges = graph_data.get("edges", [])
 
@@ -83,6 +83,23 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
             margin-top: 8px;
         }}
 
+        .sync-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #34d399;
+            margin-top: 4px;
+        }}
+        .sync-dot {{
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #34d399;
+            box-shadow: 0 0 8px #34d399;
+        }}
+
         .panel {{
             background: rgba(255, 255, 255, 0.02);
             border: 1px solid var(--surface-border);
@@ -155,6 +172,10 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
         <div class="brand-header">
             <h1 style="font-size: 1.15rem; font-weight: 700; color: #38bdf8;">🫧 Code-Maps Balloon Graph</h1>
             <span class="stats-badge" id="stats-badge">{total_nodes} Balloons • {total_edges} Strands</span>
+            <div class="sync-badge">
+                <span class="sync-dot"></span>
+                <span>Live Graph Sync Active</span>
+            </div>
         </div>
 
         <div class="panel">
@@ -237,31 +258,34 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
             return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
         }}
 
-        const rawNodes = {nodes_json};
-        const rawEdges = {edges_json};
+        let rawNodes = {nodes_json};
+        let rawEdges = {edges_json};
 
-        const nodesList = rawNodes.map(n => ({{
-            id: n.id,
-            rawLabel: n.name,
-            group: n.type,
-            shape: 'image',
-            image: createBalloonSVG(n.name, n.type, 'normal'),
-            desc: n.desc || n.full_name
-        }}));
+        function buildDataSets(nList, eList) {{
+            const nData = nList.map(n => ({{
+                id: n.id,
+                rawLabel: n.name,
+                group: n.type,
+                shape: 'image',
+                image: createBalloonSVG(n.name, n.type, 'normal'),
+                desc: n.desc || n.full_name
+            }}));
 
-        const edgesList = rawEdges.map((e, idx) => ({{
-            id: 'edge_' + idx,
-            from: e.source,
-            to: e.target,
-            label: e.label || '',
-            color: {{ color: 'rgba(255, 255, 255, 0.15)' }},
-            width: 1
-        }}));
+            const eData = eList.map((e, idx) => ({{
+                id: 'edge_' + idx,
+                from: e.source,
+                to: e.target,
+                label: e.label || '',
+                color: {{ color: 'rgba(255, 255, 255, 0.15)' }},
+                width: 1
+            }}));
 
-        const nodesDataSet = new vis.DataSet(nodesList);
-        const edgesDataSet = new vis.DataSet(edgesList);
+            return {{ nodesDataSet: new vis.DataSet(nData), edgesDataSet: new vis.DataSet(eData) }};
+        }}
+
+        let {{ nodesDataSet, edgesDataSet }} = buildDataSets(rawNodes, rawEdges);
         const container = document.getElementById('network-container');
-        const data = {{ nodes: nodesDataSet, edges: edgesDataSet }};
+        let data = {{ nodes: nodesDataSet, edges: edgesDataSet }};
         const options = {{
             physics: {{
                 enabled: true,
@@ -288,11 +312,39 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
             }}
         }};
 
-        const network = new vis.Network(container, data, options);
+        let network = new vis.Network(container, data, options);
 
         setInterval(() => {{
             network.startSimulation();
         }}, 1500);
+
+        // 🔄 AUTO-SYNC & LIVE POLLING MECHANISM (Checks map.json every 3 seconds)
+        let lastNodesHash = JSON.stringify(rawNodes.length + '_' + rawEdges.length);
+        async function checkLiveUpdate() {{
+            try {{
+                const res = await fetch('map.json?t=' + Date.now());
+                if (!res.ok) return;
+                const newMap = await res.json();
+                const newNodes = newMap.nodes || [];
+                const newEdges = newMap.edges || [];
+                const currentHash = JSON.stringify(newNodes.length + '_' + newEdges.length);
+
+                if (currentHash !== lastNodesHash) {{
+                    lastNodesHash = currentHash;
+                    rawNodes = newNodes.slice(0, 150);
+                    rawEdges = newEdges.slice(0, 250);
+                    
+                    const updated = buildDataSets(rawNodes, rawEdges);
+                    nodesDataSet = updated.nodesDataSet;
+                    edgesDataSet = updated.edgesDataSet;
+                    network.setData({{ nodes: nodesDataSet, edges: edgesDataSet }});
+                    document.getElementById('stats-badge').innerText = `${{rawNodes.length}} Balloons • ${{rawEdges.length}} Strands`;
+                }}
+            }} catch (e) {{
+                // Ignore local file CORS if opened directly via file://
+            }}
+        }}
+        setInterval(checkLiveUpdate, 3000);
 
         function applyFocusAndDim(selectedId) {{
             if (!selectedId) {{
@@ -300,8 +352,8 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
                     id: n.id,
                     image: createBalloonSVG(n.name, n.type, 'normal')
                 }})));
-                edgesDataSet.update(edgesList.map(e => ({{
-                    id: e.id,
+                edgesDataSet.update(edgesDataSet.getIds().map(eid => ({{
+                    id: eid,
                     color: {{ color: 'rgba(255, 255, 255, 0.15)' }},
                     width: 1
                 }})));
@@ -327,11 +379,14 @@ def generate_map_html(graph_data: Dict[str, Any], output_path: Path) -> None:
                 image: createBalloonSVG(n.name, n.type, n.id === selectedId ? 'active' : (connectedNodeIds.has(n.id) ? 'normal' : 'dim'))
             }})));
 
-            edgesDataSet.update(edgesList.map(e => ({{
-                id: e.id,
-                color: {{ color: connectedEdgeIds.has(e.id) ? 'rgba(56, 189, 248, 0.9)' : 'rgba(255, 255, 255, 0.02)' }},
-                width: connectedEdgeIds.has(e.id) ? 2.5 : 0.5
-            }})));
+            edgesDataSet.update(edgesDataSet.getIds().map(eid => {{
+                const isConn = connectedEdgeIds.has(eid);
+                return {{
+                    id: eid,
+                    color: {{ color: isConn ? 'rgba(56, 189, 248, 0.9)' : 'rgba(255, 255, 255, 0.02)' }},
+                    width: isConn ? 2.5 : 0.5
+                }};
+            }}));
 
             network.startSimulation();
         }}
