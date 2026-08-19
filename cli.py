@@ -5938,15 +5938,13 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         return "class:status-bar-dim"
 
     def _build_context_bar(self, percent_used: Optional[int], width: int = 1) -> str:
-        """Render visible vertical height meter ( ▂ ▃ ▄ ▅ ▆ ▇ █) based on context percent."""
+        """Render clean frameless vertical height meter ( ▂ ▃ ▄ ▅ ▆ ▇ █) based on context percent."""
         safe_percent = max(0, min(100, percent_used or 0))
-        # 8-level vertical blocks: index 0 to 7
         levels = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
         if safe_percent == 0:
-            return "[_]"
-        # Map 1-100% smoothly across 8 vertical levels
+            return " "
         idx = min(7, int((safe_percent / 100) * 8))
-        return f"[{levels[idx]}]"
+        return levels[idx]
 
     @staticmethod
     def _format_prompt_elapsed(prompt_start_time: Optional[float], prompt_duration: float, live: bool = False) -> str:
