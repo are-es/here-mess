@@ -16621,11 +16621,11 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 *self._get_extra_tui_widgets(),
                 getattr(self, "_pet_widget", None),
                 getattr(self, "_stash_panel_widget", None),
-                status_bar,
                 input_rule_top,
                 image_bar,
                 input_area,
                 input_rule_bot,
+                status_bar,
                 voice_status_bar,
                 completions_menu,
             ] if item is not None
