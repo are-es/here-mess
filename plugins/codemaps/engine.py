@@ -29,12 +29,19 @@ def compute_file_hash(path: Path) -> str:
 def scan_engine_files(root: Path) -> List[Path]:
     """Find all source code files, ignoring documentation, tests snapshots, and build artifacts."""
     found = []
-    for p in root.rglob('*'):
-        if p.is_file() and p.suffix in SUPPORTED_EXTENSIONS:
-            # Check if any parent part is in ignored dirs
-            parts = set(p.parts)
-            if not parts.intersection(IGNORED_DIRS):
-                found.append(p)
+    for dirpath, dirnames, filenames in os.walk(root):
+        # In-place directory pruning to prevent descending into ignored folders
+        dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS and not d.startswith('.')]
+        for f in filenames:
+            ext = os.path.splitext(f)[1].lower()
+            if ext in SUPPORTED_EXTENSIONS:
+                p = Path(dirpath) / f
+                try:
+                    rel_parts = set(p.relative_to(root).parts)
+                    if not rel_parts.intersection(IGNORED_DIRS):
+                        found.append(p)
+                except ValueError:
+                    pass
     return sorted(found)
 
 

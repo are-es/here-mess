@@ -12,7 +12,7 @@ from plugins.codemaps.visualizer import generate_map_html
 
 
 def resolve_codemaps_dir(cwd: Path) -> Optional[Path]:
-    """Search thoroughly for an existing codemaps folder across all root/subdirectories."""
+    """Search thoroughly for an existing codemaps folder with bounded depth and directory pruning."""
     # 1. Direct candidate paths
     candidates = [
         cwd / "codemaps",
@@ -25,11 +25,19 @@ def resolve_codemaps_dir(cwd: Path) -> Optional[Path]:
         if cand.is_dir() and (cand / "map.json").is_file():
             return cand
 
-    # 2. Recursive search in subdirectories (e.g. .hermes/<feature>/codemaps)
+    # 2. Pruned recursive search with max depth = 4
     try:
-        for p in cwd.glob("**/*"):
-            if p.is_dir() and p.name in ("codemaps", "code-maps") and (p / "map.json").is_file():
-                return p
+        root_parts_len = len(cwd.parts)
+        for dirpath, dirnames, _ in os.walk(cwd):
+            curr = Path(dirpath)
+            depth = len(curr.parts) - root_parts_len
+            if depth >= 4:
+                dirnames.clear()
+                continue
+            # Prune ignored and hidden dirs
+            dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS and not d.startswith('.')]
+            if curr.name in ("codemaps", "code-maps") and (curr / "map.json").is_file():
+                return curr
     except Exception:
         pass
 

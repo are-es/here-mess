@@ -560,7 +560,7 @@ def _run_agent_tool_execution_middleware(
         "read_file", "search_files", "session_search",
         "skill_view", "skills_list",
         "clarify", "browser_snapshot", "browser_get_images",
-        "memory",
+        "memory", "code_maps",
     })
 
     def _is_plan_allowed_write(fname: str, fargs: dict) -> bool:
