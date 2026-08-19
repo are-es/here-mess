@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Code-Maps — Floating Sphere Balloon Architecture</title>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg-color: #08080a;
+            --surface-color: rgba(14, 14, 18, 0.85);
+            --surface-border: rgba(255, 255, 255, 0.07);
+            --accent-file: #38bdf8;
+            --accent-func: #34d399;
+            --accent-class: #a855f7;
+            --text-main: #f4f4f5;
+            --text-dim: #71717a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #08080a;
+            color: var(--text-main);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+        }
+
+        #sidebar {
+            width: 380px;
+            background: var(--surface-color);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-right: 1px solid var(--surface-border);
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            z-index: 10;
+            box-shadow: 16px 0 40px rgba(0, 0, 0, 0.85);
+        }
+
+        .brand-header {
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--surface-border);
+            margin-bottom: 20px;
+        }
+
+        .stats-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: rgba(56, 189, 248, 0.12);
+            color: var(--accent-file);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            margin-top: 8px;
+        }
+
+        .sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: #34d399;
+            margin-top: 4px;
+        }
+        .sync-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #34d399;
+            box-shadow: 0 0 8px #34d399;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--surface-border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .tag {
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .tag.file { background: rgba(56, 189, 248, 0.2); color: var(--accent-file); border: 1px solid rgba(56, 189, 248, 0.4); }
+        .tag.func { background: rgba(52, 211, 153, 0.2); color: var(--accent-func); border: 1px solid rgba(52, 211, 153, 0.4); }
+        .tag.class { background: rgba(168, 85, 247, 0.2); color: var(--accent-class); border: 1px solid rgba(168, 85, 247, 0.4); }
+
+        .conn-list {
+            list-style: none;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .conn-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-dim);
+        }
+
+        #network-container {
+            flex: 1;
+            height: 100%;
+            background-color: #060608;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(24, 24, 27, 0.6) 0%, rgba(6, 6, 8, 0.95) 75%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 32px 32px, 32px 32px;
+        }
+
+        .hud-legend {
+            position: absolute;
+            top: 24px;
+            left: 404px;
+            background: rgba(14, 14, 18, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--surface-border);
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            display: flex;
+            gap: 20px;
+            pointer-events: none;
+            z-index: 5;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+        }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+        .legend-ball {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5), inset 2px 2px 4px rgba(255,255,255,0.6);
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="brand-header">
+            <h1 style="font-size: 1.15rem; font-weight: 700; color: #38bdf8;">🫧 Code-Maps Balloon Graph</h1>
+            <span class="stats-badge" id="stats-badge">150 Balloons • 110 Strands</span>
+            <div class="sync-badge">
+                <span class="sync-dot"></span>
+                <span>Live Graph Sync Active</span>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="tag file" id="inspect-tag">FILE</span>
+                <span style="font-size:0.75rem; color:var(--text-dim);" id="inspect-id">#1</span>
+            </div>
+            <h2 style="font-size: 1.15rem; margin-top: 8px; color: #fff; font-weight: 700;" id="inspect-title">-</h2>
+            <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 6px; line-height: 1.5;" id="inspect-desc">Select a balloon to inspect connections</p>
+        </div>
+
+        <div class="panel" style="flex: 1; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: var(--text-dim); font-weight: 700; text-transform: uppercase;">Connected Balloons</span>
+                <span style="font-size: 0.7rem; color: #38bdf8;" id="inspect-count">0 links</span>
+            </div>
+            <ul class="conn-list" id="inspect-links"></ul>
+        </div>
+    </div>
+
+    <div class="hud-legend">
+        <div class="legend-item"><span class="legend-ball" style="background:#0284c7;"></span> File Module Balloon</div>
+        <div class="legend-item"><span class="legend-ball" style="background:#7c3aed;"></span> Class Balloon</div>
+        <div class="legend-item"><span class="legend-ball" style="background:#059669;"></span> Function Balloon</div>
+    </div>
+
+    <div id="network-container"></div>
+
+    <script>
+        function createBalloonSVG(label, type, state = 'normal') {
+            let baseColor, specularColor, strokeColor, textColor;
+
+            if (state === 'dim') {
+                baseColor = type === 'file' ? '#081726' : (type === 'class' ? '#140c24' : '#071a13');
+                specularColor = 'rgba(255, 255, 255, 0.05)';
+                strokeColor = 'rgba(255, 255, 255, 0.05)';
+                textColor = '#334155';
+            } else if (state === 'active') {
+                baseColor = type === 'file' ? '#0284c7' : (type === 'class' ? '#7c3aed' : '#059669');
+                specularColor = '#ffffff';
+                strokeColor = '#ffffff';
+                textColor = '#ffffff';
+            } else {
+                baseColor = type === 'file' ? '#0369a1' : (type === 'class' ? '#6d28d9' : '#047857');
+                specularColor = 'rgba(255, 255, 255, 0.85)';
+                strokeColor = type === 'file' ? '#38bdf8' : (type === 'class' ? '#a855f7' : '#34d399');
+                textColor = '#f8fafc';
+            }
+
+            const size = type === 'file' ? 140 : (type === 'class' ? 110 : 90);
+            const r = size / 2 - 4;
+            const cx = size / 2;
+            const cy = size / 2;
+            const fontSize = type === 'file' ? 13 : (type === 'class' ? 11 : 10);
+
+            let displayLabel = label;
+            if (displayLabel.length > 14) {
+                displayLabel = displayLabel.substring(0, 12) + '..';
+            }
+
+            const svg = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+                <defs>
+                    <radialGradient id="sphereGrad_${type}_${state}" cx="35%" cy="30%" r="70%">
+                        <stop offset="0%" stop-color="${specularColor}" stop-opacity="${state === 'dim' ? '0.2' : '0.9'}"/>
+                        <stop offset="25%" stop-color="${baseColor}" stop-opacity="0.95"/>
+                        <stop offset="85%" stop-color="#02040a" stop-opacity="0.95"/>
+                    </radialGradient>
+                    <filter id="glow_${type}" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="${strokeColor}" flood-opacity="${state === 'dim' ? '0' : '0.4'}"/>
+                    </filter>
+                </defs>
+                <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#sphereGrad_${type}_${state})" stroke="${strokeColor}" stroke-width="${state === 'active' ? '3' : '1.5'}" filter="url(#glow_${type})"/>
+                <ellipse cx="${cx - r*0.25}" cy="${cy - r*0.35}" rx="${r*0.35}" ry="${r*0.18}" fill="#ffffff" opacity="${state === 'dim' ? '0.05' : '0.35'}" transform="rotate(-20 ${cx - r*0.25} ${cy - r*0.35})"/>
+                <text x="${cx}" y="${cy + 4}" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="${fontSize}px" font-weight="700" fill="${textColor}" letter-spacing="-0.02em">
+                    ${displayLabel}
+                </text>
+            </svg>`;
+
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        }
+
+        let rawNodes = [{"id": "file:acp_adapter/__init__.py", "name": "__init__.py", "full_name": "acp_adapter/__init__.py", "type": "file", "desc": "Source Module: acp_adapter/__init__.py"}, {"id": "file:acp_adapter/__main__.py", "name": "__main__.py", "full_name": "acp_adapter/__main__.py", "type": "file", "desc": "Source Module: acp_adapter/__main__.py"}, {"id": "file:acp_adapter/auth.py", "name": "auth.py", "full_name": "acp_adapter/auth.py", "type": "file", "desc": "Source Module: acp_adapter/auth.py"}, {"id": "file:acp_adapter/edit_approval.py", "name": "edit_approval.py", "full_name": "acp_adapter/edit_approval.py", "type": "file", "desc": "Source Module: acp_adapter/edit_approval.py"}, {"id": "file:acp_adapter/entry.py", "name": "entry.py", "full_name": "acp_adapter/entry.py", "type": "file", "desc": "Source Module: acp_adapter/entry.py"}, {"id": "file:acp_adapter/events.py", "name": "events.py", "full_name": "acp_adapter/events.py", "type": "file", "desc": "Source Module: acp_adapter/events.py"}, {"id": "file:acp_adapter/permissions.py", "name": "permissions.py", "full_name": "acp_adapter/permissions.py", "type": "file", "desc": "Source Module: acp_adapter/permissions.py"}, {"id": "file:acp_adapter/provenance.py", "name": "provenance.py", "full_name": "acp_adapter/provenance.py", "type": "file", "desc": "Source Module: acp_adapter/provenance.py"}, {"id": "file:acp_adapter/server.py", "name": "server.py", "full_name": "acp_adapter/server.py", "type": "file", "desc": "Source Module: acp_adapter/server.py"}, {"id": "file:acp_adapter/session.py", "name": "session.py", "full_name": "acp_adapter/session.py", "type": "file", "desc": "Source Module: acp_adapter/session.py"}, {"id": "file:acp_adapter/tools.py", "name": "tools.py", "full_name": "acp_adapter/tools.py", "type": "file", "desc": "Source Module: acp_adapter/tools.py"}, {"id": "file:agent/__init__.py", "name": "__init__.py", "full_name": "agent/__init__.py", "type": "file", "desc": "Source Module: agent/__init__.py"}, {"id": "file:agent/account_usage.py", "name": "account_usage.py", "full_name": "agent/account_usage.py", "type": "file", "desc": "Source Module: agent/account_usage.py"}, {"id": "file:agent/agent_definition.py", "name": "agent_definition.py", "full_name": "agent/agent_definition.py", "type": "file", "desc": "Source Module: agent/agent_definition.py"}, {"id": "file:agent/agent_init.py", "name": "agent_init.py", "full_name": "agent/agent_init.py", "type": "file", "desc": "Source Module: agent/agent_init.py"}, {"id": "file:agent/agent_registry.py", "name": "agent_registry.py", "full_name": "agent/agent_registry.py", "type": "file", "desc": "Source Module: agent/agent_registry.py"}, {"id": "file:agent/agent_runtime_helpers.py", "name": "agent_runtime_helpers.py", "full_name": "agent/agent_runtime_helpers.py", "type": "file", "desc": "Source Module: agent/agent_runtime_helpers.py"}, {"id": "file:agent/anthropic_adapter.py", "name": "anthropic_adapter.py", "full_name": "agent/anthropic_adapter.py", "type": "file", "desc": "Source Module: agent/anthropic_adapter.py"}, {"id": "file:agent/async_utils.py", "name": "async_utils.py", "full_name": "agent/async_utils.py", "type": "file", "desc": "Source Module: agent/async_utils.py"}, {"id": "file:agent/aux_accounting.py", "name": "aux_accounting.py", "full_name": "agent/aux_accounting.py", "type": "file", "desc": "Source Module: agent/aux_accounting.py"}, {"id": "file:agent/auxiliary_client.py", "name": "auxiliary_client.py", "full_name": "agent/auxiliary_client.py", "type": "file", "desc": "Source Module: agent/auxiliary_client.py"}, {"id": "file:agent/azure_identity_adapter.py", "name": "azure_identity_adapter.py", "full_name": "agent/azure_identity_adapter.py", "type": "file", "desc": "Source Module: agent/azure_identity_adapter.py"}, {"id": "file:agent/backend_identity.py", "name": "backend_identity.py", "full_name": "agent/backend_identity.py", "type": "file", "desc": "Source Module: agent/backend_identity.py"}, {"id": "file:agent/background_review.py", "name": "background_review.py", "full_name": "agent/background_review.py", "type": "file", "desc": "Source Module: agent/background_review.py"}, {"id": "file:agent/battery.py", "name": "battery.py", "full_name": "agent/battery.py", "type": "file", "desc": "Source Module: agent/battery.py"}, {"id": "file:agent/bedrock_adapter.py", "name": "bedrock_adapter.py", "full_name": "agent/bedrock_adapter.py", "type": "file", "desc": "Source Module: agent/bedrock_adapter.py"}, {"id": "file:agent/billing_links.py", "name": "billing_links.py", "full_name": "agent/billing_links.py", "type": "file", "desc": "Source Module: agent/billing_links.py"}, {"id": "file:agent/billing_usage.py", "name": "billing_usage.py", "full_name": "agent/billing_usage.py", "type": "file", "desc": "Source Module: agent/billing_usage.py"}, {"id": "file:agent/billing_view.py", "name": "billing_view.py", "full_name": "agent/billing_view.py", "type": "file", "desc": "Source Module: agent/billing_view.py"}, {"id": "file:agent/bounded_response.py", "name": "bounded_response.py", "full_name": "agent/bounded_response.py", "type": "file", "desc": "Source Module: agent/bounded_response.py"}, {"id": "file:agent/browser_provider.py", "name": "browser_provider.py", "full_name": "agent/browser_provider.py", "type": "file", "desc": "Source Module: agent/browser_provider.py"}, {"id": "file:agent/browser_registry.py", "name": "browser_registry.py", "full_name": "agent/browser_registry.py", "type": "file", "desc": "Source Module: agent/browser_registry.py"}, {"id": "file:agent/chat_completion_helpers.py", "name": "chat_completion_helpers.py", "full_name": "agent/chat_completion_helpers.py", "type": "file", "desc": "Source Module: agent/chat_completion_helpers.py"}, {"id": "file:agent/codex_responses_adapter.py", "name": "codex_responses_adapter.py", "full_name": "agent/codex_responses_adapter.py", "type": "file", "desc": "Source Module: agent/codex_responses_adapter.py"}, {"id": "file:agent/codex_runtime.py", "name": "codex_runtime.py", "full_name": "agent/codex_runtime.py", "type": "file", "desc": "Source Module: agent/codex_runtime.py"}, {"id": "file:agent/coding_context.py", "name": "coding_context.py", "full_name": "agent/coding_context.py", "type": "file", "desc": "Source Module: agent/coding_context.py"}, {"id": "file:agent/command_token_source.py", "name": "command_token_source.py", "full_name": "agent/command_token_source.py", "type": "file", "desc": "Source Module: agent/command_token_source.py"}, {"id": "file:agent/context_breakdown.py", "name": "context_breakdown.py", "full_name": "agent/context_breakdown.py", "type": "file", "desc": "Source Module: agent/context_breakdown.py"}, {"id": "file:agent/context_compressor.py", "name": "context_compressor.py", "full_name": "agent/context_compressor.py", "type": "file", "desc": "Source Module: agent/context_compressor.py"}, {"id": "file:agent/context_engine.py", "name": "context_engine.py", "full_name": "agent/context_engine.py", "type": "file", "desc": "Source Module: agent/context_engine.py"}, {"id": "class:acp_adapter/edit_approval.py:EditProposal", "name": "class EditProposal", "full_name": "acp_adapter/edit_approval.py:EditProposal", "type": "class", "line": 26, "desc": "Class in acp_adapter/edit_approval.py"}, {"id": "class:acp_adapter/entry.py:_BenignProbeMethodFilter", "name": "class _BenignProbeMethodFilter", "full_name": "acp_adapter/entry.py:_BenignProbeMethodFilter", "type": "class", "line": 52, "desc": "Class in acp_adapter/entry.py"}, {"id": "class:acp_adapter/server.py:HermesACPAgent", "name": "class HermesACPAgent", "full_name": "acp_adapter/server.py:HermesACPAgent", "type": "class", "line": 566, "desc": "Class in acp_adapter/server.py"}, {"id": "class:acp_adapter/session.py:SessionState", "name": "class SessionState", "full_name": "acp_adapter/session.py:SessionState", "type": "class", "line": 170, "desc": "Class in acp_adapter/session.py"}, {"id": "class:acp_adapter/session.py:SessionManager", "name": "class SessionManager", "full_name": "acp_adapter/session.py:SessionManager", "type": "class", "line": 186, "desc": "Class in acp_adapter/session.py"}, {"id": "class:agent/account_usage.py:AccountUsageWindow", "name": "class AccountUsageWindow", "full_name": "agent/account_usage.py:AccountUsageWindow", "type": "class", "line": 26, "desc": "Class in agent/account_usage.py"}, {"id": "class:agent/account_usage.py:AccountUsageSnapshot", "name": "class AccountUsageSnapshot", "full_name": "agent/account_usage.py:AccountUsageSnapshot", "type": "class", "line": 34, "desc": "Class in agent/account_usage.py"}, {"id": "class:agent/account_usage.py:CreditsView", "name": "class CreditsView", "full_name": "agent/account_usage.py:CreditsView", "type": "class", "line": 342, "desc": "Class in agent/account_usage.py"}, {"id": "class:agent/account_usage.py:CodexResetRedeemResult", "name": "class CodexResetRedeemResult", "full_name": "agent/account_usage.py:CodexResetRedeemResult", "type": "class", "line": 567, "desc": "Class in agent/account_usage.py"}, {"id": "class:agent/agent_definition.py:AgentDefinition", "name": "class AgentDefinition", "full_name": "agent/agent_definition.py:AgentDefinition", "type": "class", "line": 14, "desc": "Class in agent/agent_definition.py"}, {"id": "class:agent/agent_registry.py:AgentRegistry", "name": "class AgentRegistry", "full_name": "agent/agent_registry.py:AgentRegistry", "type": "class", "line": 17, "desc": "Class in agent/agent_registry.py"}, {"id": "class:agent/auxiliary_client.py:_OpenAIProxy", "name": "class _OpenAIProxy", "full_name": "agent/auxiliary_client.py:_OpenAIProxy", "type": "class", "line": 93, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AuxProbeClientStub", "name": "class _AuxProbeClientStub", "full_name": "agent/auxiliary_client.py:_AuxProbeClientStub", "type": "class", "line": 128, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:AuxiliaryExplicitCancellation", "name": "class AuxiliaryExplicitCancellation", "full_name": "agent/auxiliary_client.py:AuxiliaryExplicitCancellation", "type": "class", "line": 292, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AuxiliaryCancellationDecision", "name": "class _AuxiliaryCancellationDecision", "full_name": "agent/auxiliary_client.py:_AuxiliaryCancellationDecision", "type": "class", "line": 384, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_CodexCompletionsAdapter", "name": "class _CodexCompletionsAdapter", "full_name": "agent/auxiliary_client.py:_CodexCompletionsAdapter", "type": "class", "line": 1456, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_CodexChatShim", "name": "class _CodexChatShim", "full_name": "agent/auxiliary_client.py:_CodexChatShim", "type": "class", "line": 1895, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:CodexAuxiliaryClient", "name": "class CodexAuxiliaryClient", "full_name": "agent/auxiliary_client.py:CodexAuxiliaryClient", "type": "class", "line": 1902, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AsyncCodexCompletionsAdapter", "name": "class _AsyncCodexCompletionsAdapter", "full_name": "agent/auxiliary_client.py:_AsyncCodexCompletionsAdapter", "type": "class", "line": 1920, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AsyncCodexChatShim", "name": "class _AsyncCodexChatShim", "full_name": "agent/auxiliary_client.py:_AsyncCodexChatShim", "type": "class", "line": 1935, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:AsyncCodexAuxiliaryClient", "name": "class AsyncCodexAuxiliaryClient", "full_name": "agent/auxiliary_client.py:AsyncCodexAuxiliaryClient", "type": "class", "line": 1940, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AnthropicCompletionsAdapter", "name": "class _AnthropicCompletionsAdapter", "full_name": "agent/auxiliary_client.py:_AnthropicCompletionsAdapter", "type": "class", "line": 1959, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AnthropicChatShim", "name": "class _AnthropicChatShim", "full_name": "agent/auxiliary_client.py:_AnthropicChatShim", "type": "class", "line": 2127, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:AnthropicAuxiliaryClient", "name": "class AnthropicAuxiliaryClient", "full_name": "agent/auxiliary_client.py:AnthropicAuxiliaryClient", "type": "class", "line": 2132, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AsyncAnthropicCompletionsAdapter", "name": "class _AsyncAnthropicCompletionsAdapter", "full_name": "agent/auxiliary_client.py:_AsyncAnthropicCompletionsAdapter", "type": "class", "line": 2150, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AsyncAnthropicChatShim", "name": "class _AsyncAnthropicChatShim", "full_name": "agent/auxiliary_client.py:_AsyncAnthropicChatShim", "type": "class", "line": 2159, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:AsyncAnthropicAuxiliaryClient", "name": "class AsyncAnthropicAuxiliaryClient", "full_name": "agent/auxiliary_client.py:AsyncAnthropicAuxiliaryClient", "type": "class", "line": 2164, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_BedrockCompletionsAdapter", "name": "class _BedrockCompletionsAdapter", "full_name": "agent/auxiliary_client.py:_BedrockCompletionsAdapter", "type": "class", "line": 2176, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_BedrockChatShim", "name": "class _BedrockChatShim", "full_name": "agent/auxiliary_client.py:_BedrockChatShim", "type": "class", "line": 2231, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:BedrockAuxiliaryClient", "name": "class BedrockAuxiliaryClient", "full_name": "agent/auxiliary_client.py:BedrockAuxiliaryClient", "type": "class", "line": 2236, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AsyncBedrockCompletionsAdapter", "name": "class _AsyncBedrockCompletionsAdapter", "full_name": "agent/auxiliary_client.py:_AsyncBedrockCompletionsAdapter", "type": "class", "line": 2251, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_AsyncBedrockChatShim", "name": "class _AsyncBedrockChatShim", "full_name": "agent/auxiliary_client.py:_AsyncBedrockChatShim", "type": "class", "line": 2260, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:AsyncBedrockAuxiliaryClient", "name": "class AsyncBedrockAuxiliaryClient", "full_name": "agent/auxiliary_client.py:AsyncBedrockAuxiliaryClient", "type": "class", "line": 2265, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_FallbackDestination", "name": "class _FallbackDestination", "full_name": "agent/auxiliary_client.py:_FallbackDestination", "type": "class", "line": 4921, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_CallableCacheDiscriminator", "name": "class _CallableCacheDiscriminator", "full_name": "agent/auxiliary_client.py:_CallableCacheDiscriminator", "type": "class", "line": 7374, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/auxiliary_client.py:_ChatStreamAccumulator", "name": "class _ChatStreamAccumulator", "full_name": "agent/auxiliary_client.py:_ChatStreamAccumulator", "type": "class", "line": 8930, "desc": "Class in agent/auxiliary_client.py"}, {"id": "class:agent/azure_identity_adapter.py:EntraIdentityConfig", "name": "class EntraIdentityConfig", "full_name": "agent/azure_identity_adapter.py:EntraIdentityConfig", "type": "class", "line": 123, "desc": "Class in agent/azure_identity_adapter.py"}, {"id": "class:agent/backend_identity.py:FailureScope", "name": "class FailureScope", "full_name": "agent/backend_identity.py:FailureScope", "type": "class", "line": 42, "desc": "Class in agent/backend_identity.py"}, {"id": "class:agent/backend_identity.py:BackendIdentity", "name": "class BackendIdentity", "full_name": "agent/backend_identity.py:BackendIdentity", "type": "class", "line": 88, "desc": "Class in agent/backend_identity.py"}, {"id": "class:agent/battery.py:BatteryStatus", "name": "class BatteryStatus", "full_name": "agent/battery.py:BatteryStatus", "type": "class", "line": 21, "desc": "Class in agent/battery.py"}, {"id": "func:acp_adapter/auth.py:detect_provider", "name": "detect_provider()", "full_name": "acp_adapter/auth.py:detect_provider", "type": "func", "line": 11, "desc": "Function in acp_adapter/auth.py"}, {"id": "func:acp_adapter/auth.py:has_provider", "name": "has_provider()", "full_name": "acp_adapter/auth.py:has_provider", "type": "func", "line": 36, "desc": "Function in acp_adapter/auth.py"}, {"id": "func:acp_adapter/auth.py:build_auth_methods", "name": "build_auth_methods()", "full_name": "acp_adapter/auth.py:build_auth_methods", "type": "func", "line": 41, "desc": "Function in acp_adapter/auth.py"}, {"id": "func:acp_adapter/edit_approval.py:set_edit_approval_requester", "name": "set_edit_approval_requester()", "full_name": "acp_adapter/edit_approval.py:set_edit_approval_requester", "type": "func", "line": 51, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:reset_edit_approval_requester", "name": "reset_edit_approval_requester()", "full_name": "acp_adapter/edit_approval.py:reset_edit_approval_requester", "type": "func", "line": 57, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:clear_edit_approval_requester", "name": "clear_edit_approval_requester()", "full_name": "acp_adapter/edit_approval.py:clear_edit_approval_requester", "type": "func", "line": 63, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:get_edit_approval_requester", "name": "get_edit_approval_requester()", "full_name": "acp_adapter/edit_approval.py:get_edit_approval_requester", "type": "func", "line": 69, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:_read_text_if_exists", "name": "_read_text_if_exists()", "full_name": "acp_adapter/edit_approval.py:_read_text_if_exists", "type": "func", "line": 73, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:_proposal_for_write_file", "name": "_proposal_for_write_file()", "full_name": "acp_adapter/edit_approval.py:_proposal_for_write_file", "type": "func", "line": 82, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:_proposal_for_patch_replace", "name": "_proposal_for_patch_replace()", "full_name": "acp_adapter/edit_approval.py:_proposal_for_patch_replace", "type": "func", "line": 98, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:_extract_v4a_patch_paths", "name": "_extract_v4a_patch_paths()", "full_name": "acp_adapter/edit_approval.py:_extract_v4a_patch_paths", "type": "func", "line": 131, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:_proposal_for_patch_v4a", "name": "_proposal_for_patch_v4a()", "full_name": "acp_adapter/edit_approval.py:_proposal_for_patch_v4a", "type": "func", "line": 155, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:build_edit_proposal", "name": "build_edit_proposal()", "full_name": "acp_adapter/edit_approval.py:build_edit_proposal", "type": "func", "line": 178, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:_is_sensitive_auto_approve_path", "name": "_is_sensitive_auto_approve_path()", "full_name": "acp_adapter/edit_approval.py:_is_sensitive_auto_approve_path", "type": "func", "line": 192, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:should_auto_approve_edit", "name": "should_auto_approve_edit()", "full_name": "acp_adapter/edit_approval.py:should_auto_approve_edit", "type": "func", "line": 200, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:maybe_require_edit_approval", "name": "maybe_require_edit_approval()", "full_name": "acp_adapter/edit_approval.py:maybe_require_edit_approval", "type": "func", "line": 233, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:build_acp_edit_tool_call", "name": "build_acp_edit_tool_call()", "full_name": "acp_adapter/edit_approval.py:build_acp_edit_tool_call", "type": "func", "line": 264, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "func:acp_adapter/edit_approval.py:make_acp_edit_approval_requester", "name": "make_acp_edit_approval_requester()", "full_name": "acp_adapter/edit_approval.py:make_acp_edit_approval_requester", "type": "func", "line": 286, "desc": "Function in acp_adapter/edit_approval.py"}, {"id": "method:acp_adapter/entry.py:_BenignProbeMethodFilter:filter", "name": "filter()", "full_name": "acp_adapter/entry.py:_BenignProbeMethodFilter.filter", "type": "func", "line": 59, "desc": "Method in _BenignProbeMethodFilter"}, {"id": "func:acp_adapter/entry.py:_setup_logging", "name": "_setup_logging()", "full_name": "acp_adapter/entry.py:_setup_logging", "type": "func", "line": 81, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/entry.py:_load_env", "name": "_load_env()", "full_name": "acp_adapter/entry.py:_load_env", "type": "func", "line": 104, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/entry.py:_parse_args", "name": "_parse_args()", "full_name": "acp_adapter/entry.py:_parse_args", "type": "func", "line": 119, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/entry.py:_print_version", "name": "_print_version()", "full_name": "acp_adapter/entry.py:_print_version", "type": "func", "line": 152, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/entry.py:_run_check", "name": "_run_check()", "full_name": "acp_adapter/entry.py:_run_check", "type": "func", "line": 158, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/entry.py:_run_setup", "name": "_run_setup()", "full_name": "acp_adapter/entry.py:_run_setup", "type": "func", "line": 165, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/entry.py:_run_setup_browser", "name": "_run_setup_browser()", "full_name": "acp_adapter/entry.py:_run_setup_browser", "type": "func", "line": 192, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/entry.py:main", "name": "main()", "full_name": "acp_adapter/entry.py:main", "type": "func", "line": 220, "desc": "Function in acp_adapter/entry.py"}, {"id": "func:acp_adapter/events.py:_json_loads_maybe_prefix", "name": "_json_loads_maybe_prefix()", "full_name": "acp_adapter/events.py:_json_loads_maybe_prefix", "type": "func", "line": 28, "desc": "Function in acp_adapter/events.py"}, {"id": "func:acp_adapter/events.py:_build_plan_update_from_todo_result", "name": "_build_plan_update_from_todo_result()", "full_name": "acp_adapter/events.py:_build_plan_update_from_todo_result", "type": "func", "line": 39, "desc": "Function in acp_adapter/events.py"}, {"id": "func:acp_adapter/events.py:_send_update", "name": "_send_update()", "full_name": "acp_adapter/events.py:_send_update", "type": "func", "line": 87, "desc": "Function in acp_adapter/events.py"}, {"id": "func:acp_adapter/events.py:make_tool_progress_cb", "name": "make_tool_progress_cb()", "full_name": "acp_adapter/events.py:make_tool_progress_cb", "type": "func", "line": 114, "desc": "Function in acp_adapter/events.py"}, {"id": "func:acp_adapter/events.py:make_thinking_cb", "name": "make_thinking_cb()", "full_name": "acp_adapter/events.py:make_thinking_cb", "type": "func", "line": 189, "desc": "Function in acp_adapter/events.py"}, {"id": "func:acp_adapter/events.py:make_step_cb", "name": "make_step_cb()", "full_name": "acp_adapter/events.py:make_step_cb", "type": "func", "line": 209, "desc": "Function in acp_adapter/events.py"}, {"id": "func:acp_adapter/events.py:make_message_cb", "name": "make_message_cb()", "full_name": "acp_adapter/events.py:make_message_cb", "type": "func", "line": 266, "desc": "Function in acp_adapter/events.py"}, {"id": "func:acp_adapter/permissions.py:_permission_option_supports_kind", "name": "_permission_option_supports_kind()", "full_name": "acp_adapter/permissions.py:_permission_option_supports_kind", "type": "func", "line": 32, "desc": "Function in acp_adapter/permissions.py"}, {"id": "func:acp_adapter/permissions.py:_build_permission_options", "name": "_build_permission_options()", "full_name": "acp_adapter/permissions.py:_build_permission_options", "type": "func", "line": 41, "desc": "Function in acp_adapter/permissions.py"}, {"id": "func:acp_adapter/permissions.py:_build_permission_tool_call", "name": "_build_permission_tool_call()", "full_name": "acp_adapter/permissions.py:_build_permission_tool_call", "type": "func", "line": 76, "desc": "Function in acp_adapter/permissions.py"}, {"id": "func:acp_adapter/permissions.py:_map_outcome_to_hermes", "name": "_map_outcome_to_hermes()", "full_name": "acp_adapter/permissions.py:_map_outcome_to_hermes", "type": "func", "line": 98, "desc": "Function in acp_adapter/permissions.py"}, {"id": "func:acp_adapter/permissions.py:make_approval_callback", "name": "make_approval_callback()", "full_name": "acp_adapter/permissions.py:make_approval_callback", "type": "func", "line": 110, "desc": "Function in acp_adapter/permissions.py"}, {"id": "func:acp_adapter/provenance.py:build_session_provenance", "name": "build_session_provenance()", "full_name": "acp_adapter/provenance.py:build_session_provenance", "type": "func", "line": 22, "desc": "Function in acp_adapter/provenance.py"}, {"id": "func:acp_adapter/provenance.py:session_provenance_meta", "name": "session_provenance_meta()", "full_name": "acp_adapter/provenance.py:session_provenance_meta", "type": "func", "line": 111, "desc": "Function in acp_adapter/provenance.py"}, {"id": "func:acp_adapter/server.py:_named_custom_provider_catalogs", "name": "_named_custom_provider_catalogs()", "full_name": "acp_adapter/server.py:_named_custom_provider_catalogs", "type": "func", "line": 90, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_resource_display_name", "name": "_resource_display_name()", "full_name": "acp_adapter/server.py:_resource_display_name", "type": "func", "line": 226, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_is_text_resource", "name": "_is_text_resource()", "full_name": "acp_adapter/server.py:_is_text_resource", "type": "func", "line": 241, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_is_image_resource", "name": "_is_image_resource()", "full_name": "acp_adapter/server.py:_is_image_resource", "type": "func", "line": 248, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_guess_image_mime_from_path", "name": "_guess_image_mime_from_path()", "full_name": "acp_adapter/server.py:_guess_image_mime_from_path", "type": "func", "line": 253, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_image_data_url", "name": "_image_data_url()", "full_name": "acp_adapter/server.py:_image_data_url", "type": "func", "line": 266, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_path_from_file_uri", "name": "_path_from_file_uri()", "full_name": "acp_adapter/server.py:_path_from_file_uri", "type": "func", "line": 270, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_decode_text_bytes", "name": "_decode_text_bytes()", "full_name": "acp_adapter/server.py:_decode_text_bytes", "type": "func", "line": 305, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_format_resource_text", "name": "_format_resource_text()", "full_name": "acp_adapter/server.py:_format_resource_text", "type": "func", "line": 317, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_resource_link_to_parts", "name": "_resource_link_to_parts()", "full_name": "acp_adapter/server.py:_resource_link_to_parts", "type": "func", "line": 332, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_embedded_resource_to_parts", "name": "_embedded_resource_to_parts()", "full_name": "acp_adapter/server.py:_embedded_resource_to_parts", "type": "func", "line": 431, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_extract_text", "name": "_extract_text()", "full_name": "acp_adapter/server.py:_extract_text", "type": "func", "line": 480, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_image_block_to_openai_part", "name": "_image_block_to_openai_part()", "full_name": "acp_adapter/server.py:_image_block_to_openai_part", "type": "func", "line": 499, "desc": "Function in acp_adapter/server.py"}, {"id": "func:acp_adapter/server.py:_content_blocks_to_openai_user_content", "name": "_content_blocks_to_openai_user_content()", "full_name": "acp_adapter/server.py:_content_blocks_to_openai_user_content", "type": "func", "line": 515, "desc": "Function in acp_adapter/server.py"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:__init__", "name": "__init__()", "full_name": "acp_adapter/server.py:HermesACPAgent.__init__", "type": "func", "line": 637, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:on_connect", "name": "on_connect()", "full_name": "acp_adapter/server.py:HermesACPAgent.on_connect", "type": "func", "line": 644, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_session_modes", "name": "_session_modes()", "full_name": "acp_adapter/server.py:HermesACPAgent._session_modes", "type": "func", "line": 650, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_edit_approval_policy_for_state", "name": "_edit_approval_policy_for_state()", "full_name": "acp_adapter/server.py:HermesACPAgent._edit_approval_policy_for_state", "type": "func", "line": 683, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_encode_model_choice", "name": "_encode_model_choice()", "full_name": "acp_adapter/server.py:HermesACPAgent._encode_model_choice", "type": "func", "line": 689, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_build_model_state", "name": "_build_model_state()", "full_name": "acp_adapter/server.py:HermesACPAgent._build_model_state", "type": "func", "line": 699, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_resolve_model_selection", "name": "_resolve_model_selection()", "full_name": "acp_adapter/server.py:HermesACPAgent._resolve_model_selection", "type": "func", "line": 824, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_build_usage_update", "name": "_build_usage_update()", "full_name": "acp_adapter/server.py:HermesACPAgent._build_usage_update", "type": "func", "line": 843, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_send_usage_update", "name": "_send_usage_update()", "full_name": "acp_adapter/server.py:HermesACPAgent._send_usage_update", "type": "func", "line": 876, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_provenance_meta", "name": "_provenance_meta()", "full_name": "acp_adapter/server.py:HermesACPAgent._provenance_meta", "type": "func", "line": 895, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_send_session_info_update", "name": "_send_session_info_update()", "full_name": "acp_adapter/server.py:HermesACPAgent._send_session_info_update", "type": "func", "line": 915, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_schedule_usage_update", "name": "_schedule_usage_update()", "full_name": "acp_adapter/server.py:HermesACPAgent._schedule_usage_update", "type": "func", "line": 963, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_register_session_mcp_servers", "name": "_register_session_mcp_servers()", "full_name": "acp_adapter/server.py:HermesACPAgent._register_session_mcp_servers", "type": "func", "line": 970, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:_schedule_mcp_late_refresh", "name": "_schedule_mcp_late_refresh()", "full_name": "acp_adapter/server.py:HermesACPAgent._schedule_mcp_late_refresh", "type": "func", "line": 1041, "desc": "Method in HermesACPAgent"}, {"id": "method:acp_adapter/server.py:HermesACPAgent:initialize", "name": "initialize()", "full_name": "acp_adapter/server.py:HermesACPAgent.initialize", "type": "func", "line": 1139, "desc": "Method in HermesACPAgent"}];
+        let rawEdges = [{"source": "file:acp_adapter/auth.py", "target": "func:acp_adapter/auth.py:detect_provider", "label": "defines"}, {"source": "file:acp_adapter/auth.py", "target": "func:acp_adapter/auth.py:has_provider", "label": "defines"}, {"source": "file:acp_adapter/auth.py", "target": "func:acp_adapter/auth.py:build_auth_methods", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "class:acp_adapter/edit_approval.py:EditProposal", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:set_edit_approval_requester", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:reset_edit_approval_requester", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:clear_edit_approval_requester", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:get_edit_approval_requester", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:_read_text_if_exists", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:_proposal_for_write_file", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:_proposal_for_patch_replace", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:_extract_v4a_patch_paths", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:_proposal_for_patch_v4a", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:build_edit_proposal", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:_is_sensitive_auto_approve_path", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:should_auto_approve_edit", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:maybe_require_edit_approval", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:build_acp_edit_tool_call", "label": "defines"}, {"source": "file:acp_adapter/edit_approval.py", "target": "func:acp_adapter/edit_approval.py:make_acp_edit_approval_requester", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "class:acp_adapter/entry.py:_BenignProbeMethodFilter", "label": "defines"}, {"source": "class:acp_adapter/entry.py:_BenignProbeMethodFilter", "target": "method:acp_adapter/entry.py:_BenignProbeMethodFilter:filter", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:_setup_logging", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:_load_env", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:_parse_args", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:_print_version", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:_run_check", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:_run_setup", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:_run_setup_browser", "label": "defines"}, {"source": "file:acp_adapter/entry.py", "target": "func:acp_adapter/entry.py:main", "label": "defines"}, {"source": "file:acp_adapter/events.py", "target": "func:acp_adapter/events.py:_json_loads_maybe_prefix", "label": "defines"}, {"source": "file:acp_adapter/events.py", "target": "func:acp_adapter/events.py:_build_plan_update_from_todo_result", "label": "defines"}, {"source": "file:acp_adapter/events.py", "target": "func:acp_adapter/events.py:_send_update", "label": "defines"}, {"source": "file:acp_adapter/events.py", "target": "func:acp_adapter/events.py:make_tool_progress_cb", "label": "defines"}, {"source": "file:acp_adapter/events.py", "target": "func:acp_adapter/events.py:make_thinking_cb", "label": "defines"}, {"source": "file:acp_adapter/events.py", "target": "func:acp_adapter/events.py:make_step_cb", "label": "defines"}, {"source": "file:acp_adapter/events.py", "target": "func:acp_adapter/events.py:make_message_cb", "label": "defines"}, {"source": "file:acp_adapter/permissions.py", "target": "func:acp_adapter/permissions.py:_permission_option_supports_kind", "label": "defines"}, {"source": "file:acp_adapter/permissions.py", "target": "func:acp_adapter/permissions.py:_build_permission_options", "label": "defines"}, {"source": "file:acp_adapter/permissions.py", "target": "func:acp_adapter/permissions.py:_build_permission_tool_call", "label": "defines"}, {"source": "file:acp_adapter/permissions.py", "target": "func:acp_adapter/permissions.py:_map_outcome_to_hermes", "label": "defines"}, {"source": "file:acp_adapter/permissions.py", "target": "func:acp_adapter/permissions.py:make_approval_callback", "label": "defines"}, {"source": "file:acp_adapter/provenance.py", "target": "func:acp_adapter/provenance.py:build_session_provenance", "label": "defines"}, {"source": "file:acp_adapter/provenance.py", "target": "func:acp_adapter/provenance.py:session_provenance_meta", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_named_custom_provider_catalogs", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_resource_display_name", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_is_text_resource", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_is_image_resource", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_guess_image_mime_from_path", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_image_data_url", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_path_from_file_uri", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_decode_text_bytes", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_format_resource_text", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_resource_link_to_parts", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_embedded_resource_to_parts", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_extract_text", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_image_block_to_openai_part", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "func:acp_adapter/server.py:_content_blocks_to_openai_user_content", "label": "defines"}, {"source": "file:acp_adapter/server.py", "target": "class:acp_adapter/server.py:HermesACPAgent", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:__init__", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:on_connect", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_session_modes", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_edit_approval_policy_for_state", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_encode_model_choice", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_build_model_state", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_resolve_model_selection", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_build_usage_update", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_send_usage_update", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_provenance_meta", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_send_session_info_update", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_schedule_usage_update", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_register_session_mcp_servers", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:_schedule_mcp_late_refresh", "label": "defines"}, {"source": "class:acp_adapter/server.py:HermesACPAgent", "target": "method:acp_adapter/server.py:HermesACPAgent:initialize", "label": "defines"}, {"source": "file:acp_adapter/session.py", "target": "class:acp_adapter/session.py:SessionState", "label": "defines"}, {"source": "file:acp_adapter/session.py", "target": "class:acp_adapter/session.py:SessionManager", "label": "defines"}, {"source": "file:agent/account_usage.py", "target": "class:agent/account_usage.py:AccountUsageWindow", "label": "defines"}, {"source": "file:agent/account_usage.py", "target": "class:agent/account_usage.py:AccountUsageSnapshot", "label": "defines"}, {"source": "file:agent/account_usage.py", "target": "class:agent/account_usage.py:CreditsView", "label": "defines"}, {"source": "file:agent/account_usage.py", "target": "class:agent/account_usage.py:CodexResetRedeemResult", "label": "defines"}, {"source": "file:agent/agent_definition.py", "target": "class:agent/agent_definition.py:AgentDefinition", "label": "defines"}, {"source": "file:agent/agent_registry.py", "target": "class:agent/agent_registry.py:AgentRegistry", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_OpenAIProxy", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AuxProbeClientStub", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:AuxiliaryExplicitCancellation", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AuxiliaryCancellationDecision", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_CodexCompletionsAdapter", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_CodexChatShim", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:CodexAuxiliaryClient", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AsyncCodexCompletionsAdapter", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AsyncCodexChatShim", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:AsyncCodexAuxiliaryClient", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AnthropicCompletionsAdapter", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AnthropicChatShim", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:AnthropicAuxiliaryClient", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AsyncAnthropicCompletionsAdapter", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AsyncAnthropicChatShim", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:AsyncAnthropicAuxiliaryClient", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_BedrockCompletionsAdapter", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_BedrockChatShim", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:BedrockAuxiliaryClient", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AsyncBedrockCompletionsAdapter", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_AsyncBedrockChatShim", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:AsyncBedrockAuxiliaryClient", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_FallbackDestination", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_CallableCacheDiscriminator", "label": "defines"}, {"source": "file:agent/auxiliary_client.py", "target": "class:agent/auxiliary_client.py:_ChatStreamAccumulator", "label": "defines"}, {"source": "file:agent/azure_identity_adapter.py", "target": "class:agent/azure_identity_adapter.py:EntraIdentityConfig", "label": "defines"}, {"source": "file:agent/backend_identity.py", "target": "class:agent/backend_identity.py:FailureScope", "label": "defines"}, {"source": "file:agent/backend_identity.py", "target": "class:agent/backend_identity.py:BackendIdentity", "label": "defines"}, {"source": "file:agent/battery.py", "target": "class:agent/battery.py:BatteryStatus", "label": "defines"}];
+
+        function buildDataSets(nList, eList) {
+            const nData = nList.map(n => ({
+                id: n.id,
+                rawLabel: n.name,
+                group: n.type,
+                shape: 'image',
+                image: createBalloonSVG(n.name, n.type, 'normal'),
+                desc: n.desc || n.full_name
+            }));
+
+            const eData = eList.map((e, idx) => ({
+                id: 'edge_' + idx,
+                from: e.source,
+                to: e.target,
+                label: e.label || '',
+                color: { color: 'rgba(255, 255, 255, 0.15)' },
+                width: 1
+            }));
+
+            return { nodesDataSet: new vis.DataSet(nData), edgesDataSet: new vis.DataSet(eData) };
+        }
+
+        let { nodesDataSet, edgesDataSet } = buildDataSets(rawNodes, rawEdges);
+        const container = document.getElementById('network-container');
+        let data = { nodes: nodesDataSet, edges: edgesDataSet };
+        const options = {
+            physics: {
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: {
+                    gravitationalConstant: -100,
+                    centralGravity: 0.008,
+                    springLength: 110,
+                    springConstant: 0.05,
+                    damping: 0.35
+                },
+                maxVelocity: 35,
+                minVelocity: 0,
+                stabilization: false,
+                timestep: 0.5
+            },
+            interaction: {
+                hover: true,
+                tooltipDelay: 100,
+                hideEdgesOnDrag: false,
+                zoomView: true,
+                dragView: true,
+                dragNodes: true
+            }
+        };
+
+        let network = new vis.Network(container, data, options);
+
+        setInterval(() => {
+            network.startSimulation();
+        }, 1500);
+
+        // 🔄 AUTO-SYNC & LIVE POLLING MECHANISM (Checks map.json every 3 seconds)
+        let lastNodesHash = JSON.stringify(rawNodes.length + '_' + rawEdges.length);
+        async function checkLiveUpdate() {
+            try {
+                const res = await fetch('map.json?t=' + Date.now());
+                if (!res.ok) return;
+                const newMap = await res.json();
+                const newNodes = newMap.nodes || [];
+                const newEdges = newMap.edges || [];
+                const currentHash = JSON.stringify(newNodes.length + '_' + newEdges.length);
+
+                if (currentHash !== lastNodesHash) {
+                    lastNodesHash = currentHash;
+                    rawNodes = newNodes.slice(0, 150);
+                    rawEdges = newEdges.slice(0, 250);
+                    
+                    const updated = buildDataSets(rawNodes, rawEdges);
+                    nodesDataSet = updated.nodesDataSet;
+                    edgesDataSet = updated.edgesDataSet;
+                    network.setData({ nodes: nodesDataSet, edges: edgesDataSet });
+                    document.getElementById('stats-badge').innerText = `${rawNodes.length} Balloons • ${rawEdges.length} Strands`;
+                }
+            } catch (e) {
+                // Ignore local file CORS if opened directly via file://
+            }
+        }
+        setInterval(checkLiveUpdate, 3000);
+
+        function applyFocusAndDim(selectedId) {
+            if (!selectedId) {
+                nodesDataSet.update(rawNodes.map(n => ({
+                    id: n.id,
+                    image: createBalloonSVG(n.name, n.type, 'normal')
+                })));
+                edgesDataSet.update(edgesDataSet.getIds().map(eid => ({
+                    id: eid,
+                    color: { color: 'rgba(255, 255, 255, 0.15)' },
+                    width: 1
+                })));
+                network.startSimulation();
+                return;
+            }
+
+            const connectedNodeIds = new Set([selectedId]);
+            const connectedEdgeIds = new Set();
+
+            edgesDataSet.forEach(e => {
+                if (e.from === selectedId) {
+                    connectedNodeIds.add(e.to);
+                    connectedEdgeIds.add(e.id);
+                } else if (e.to === selectedId) {
+                    connectedNodeIds.add(e.from);
+                    connectedEdgeIds.add(e.id);
+                }
+            });
+
+            nodesDataSet.update(rawNodes.map(n => ({
+                id: n.id,
+                image: createBalloonSVG(n.name, n.type, n.id === selectedId ? 'active' : (connectedNodeIds.has(n.id) ? 'normal' : 'dim'))
+            })));
+
+            edgesDataSet.update(edgesDataSet.getIds().map(eid => {
+                const isConn = connectedEdgeIds.has(eid);
+                return {
+                    id: eid,
+                    color: { color: isConn ? 'rgba(56, 189, 248, 0.9)' : 'rgba(255, 255, 255, 0.02)' },
+                    width: isConn ? 2.5 : 0.5
+                };
+            }));
+
+            network.startSimulation();
+        }
+
+        function updateInspector(nodeId) {
+            const node = rawNodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            document.getElementById('inspect-title').innerText = node.name;
+            document.getElementById('inspect-id').innerText = node.id;
+            document.getElementById('inspect-desc').innerText = node.desc || node.full_name;
+            const tag = document.getElementById('inspect-tag');
+            tag.innerText = (node.type || 'node').toUpperCase();
+            tag.className = 'tag ' + node.type;
+
+            const activeLinks = rawEdges.filter(e => e.source === node.id || e.target === node.id);
+            document.getElementById('inspect-count').innerText = `${activeLinks.length} connections`;
+
+            const list = document.getElementById('inspect-links');
+            list.innerHTML = '';
+            activeLinks.forEach(e => {
+                const isOut = e.source === node.id;
+                const peerId = isOut ? e.target : e.source;
+                const peer = rawNodes.find(n => n.id === peerId);
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${peer ? peer.name : 'external'}</span> <span style="color:#38bdf8; font-weight:600;">${isOut ? '→ ' + e.label : '← ' + e.label}</span>`;
+                list.appendChild(li);
+            });
+        }
+
+        network.on('selectNode', function (params) {
+            if (params.nodes.length > 0) {
+                const selId = params.nodes[0];
+                updateInspector(selId);
+                applyFocusAndDim(selId);
+            }
+        });
+
+        network.on('deselectNode', function () {
+            applyFocusAndDim(null);
+        });
+
+        if (rawNodes.length > 0) updateInspector(rawNodes[0].id);
+    </script>
+</body>
+</html>

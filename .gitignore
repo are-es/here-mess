@@ -12,7 +12,13 @@ act/
 .venv
 .vscode/
 .env
-.ares/
+# .ares workspace — allow planning docs and codemaps, ignore runtime cache
+.ares/*
+!.ares/**/
+!.ares/**/*.md
+!.ares/**/*.html
+!.ares/**/map.json
+!.ares/**/checksums.json
 .agents/
 .op.env
 .env.local
