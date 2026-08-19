@@ -2203,9 +2203,9 @@ def warn_deprecated_cwd_env_vars(config: Optional[Dict[str, Any]] = None) -> Non
             return
 
     terminal_cfg = config.get("terminal", {})
-    config_cwd = terminal_cfg.get("cwd", ".") if isinstance(terminal_cfg, dict) else "."
-    # Only warn if config.yaml doesn't have an explicit path
-    config_has_explicit_cwd = config_cwd not in {".", "auto", "cwd", ""}
+    # If terminal.cwd is explicitly defined (even as "." / "auto"), the user has a valid config.yaml setting
+    # and the in-memory TERMINAL_CWD is an internal runtime bridge, not a stale deprecated .env setting.
+    config_has_cwd_setting = isinstance(terminal_cfg, dict) and "cwd" in terminal_cfg
 
     lines: list[str] = []
     if messaging_cwd:
@@ -2213,8 +2213,7 @@ def warn_deprecated_cwd_env_vars(config: Optional[Dict[str, Any]] = None) -> Non
             f"  \033[33m⚠\033[0m MESSAGING_CWD={messaging_cwd} found in .env — "
             f"this is deprecated."
         )
-    if terminal_cwd_env and not config_has_explicit_cwd:
-        # TERMINAL_CWD in env but not from config bridge — likely from .env
+    if terminal_cwd_env and not config_has_cwd_setting:
         lines.append(
             f"  \033[33m⚠\033[0m TERMINAL_CWD={terminal_cwd_env} found in .env — "
             f"this is deprecated."
