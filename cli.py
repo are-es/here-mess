@@ -5264,6 +5264,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         self._slash_confirm_state = None
         self._slash_confirm_deadline = 0
         self._model_picker_state = None
+        self._model_switcher_state = None  # Ctrl+E Quick Alt-Tab Switcher
         # Armed when a bare `/resume` prints the recent-sessions list so the
         # very next bare numeric input (e.g. `3`) resolves to that session.
         # Holds the exact list used for index resolution; one-shot (cleared on
@@ -10274,6 +10275,18 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         _append_panel_line(lines, 'class:approval-border', 'class:approval-cmd', 'Type 1/2/3 or use ↑/↓ then Enter. ESC/Ctrl+C cancels.', box_width)
         lines.append(('class:approval-border', '╰' + ('─' * box_width) + '╯\n'))
         return lines
+
+    def _get_available_model_aliases(self) -> list[tuple[str, str, str]]:
+        """Return list of (alias_name, model_id, provider) from config."""
+        try:
+            from hermes_cli.model_switch import _load_direct_aliases
+            aliases_dict = _load_direct_aliases()
+            items = []
+            for name, da in aliases_dict.items():
+                items.append((name, da.model, da.provider))
+            return items
+        except Exception:
+            return []
 
     def _open_model_picker(self, providers: list, current_model: str, current_provider: str, user_provs=None, custom_provs=None) -> None:
         """Open prompt_toolkit-native /model picker modal."""
@@ -16566,6 +16579,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         slash_confirm_widget=None,
         clarify_widget,
         model_picker_widget=None,
+        model_switcher_widget=None,
         spinner_widget=None,
         spacer,
         status_bar,
@@ -16591,6 +16605,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 slash_confirm_widget,
                 clarify_widget,
                 model_picker_widget,
+                model_switcher_widget,
                 spinner_widget,
                 spacer,
                 *self._get_extra_tui_widgets(),
@@ -17500,9 +17515,70 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
         @kb.add('escape', filter=Condition(lambda: bool(self._model_picker_state)), eager=True)
         def model_picker_escape(event):
-            """ESC closes the /model picker."""
+            # ESC closes the /model picker.
             self._close_model_picker()
             event.app.current_buffer.reset()
+            event.app.invalidate()
+
+        # --- Ctrl+E Quick Model Switcher keybindings ---
+        @kb.add('c-e')
+        def handle_ctrl_e_model_switcher(event):
+            """Ctrl+E: Quick model switcher (Alt+Tab style rotation)."""
+            aliases = self._get_available_model_aliases()
+            if not aliases:
+                # If no aliases configured, open standard model picker
+                self.process_command("/model")
+                event.app.invalidate()
+                return
+
+            if self._model_switcher_state is None:
+                # Find index matching current model if possible
+                cur_idx = 0
+                for i, (name, mid, prov) in enumerate(aliases):
+                    if mid == self.model or name == self.model:
+                        cur_idx = (i + 1) % len(aliases)
+                        break
+                self._model_switcher_state = {
+                    "aliases": aliases,
+                    "selected": cur_idx if cur_idx < len(aliases) else 0,
+                }
+            else:
+                # Rotate to next alias (Alt+Tab cycle)
+                cur = self._model_switcher_state.get("selected", 0)
+                self._model_switcher_state["selected"] = (cur + 1) % len(aliases)
+
+            event.app.invalidate()
+
+        @kb.add('left', filter=Condition(lambda: bool(self._model_switcher_state)))
+        def model_switcher_left(event):
+            if self._model_switcher_state:
+                aliases = self._model_switcher_state.get("aliases", [])
+                cur = self._model_switcher_state.get("selected", 0)
+                self._model_switcher_state["selected"] = (cur - 1) % len(aliases)
+                event.app.invalidate()
+
+        @kb.add('right', filter=Condition(lambda: bool(self._model_switcher_state)))
+        def model_switcher_right(event):
+            if self._model_switcher_state:
+                aliases = self._model_switcher_state.get("aliases", [])
+                cur = self._model_switcher_state.get("selected", 0)
+                self._model_switcher_state["selected"] = (cur + 1) % len(aliases)
+                event.app.invalidate()
+
+        @kb.add('enter', filter=Condition(lambda: bool(self._model_switcher_state)), eager=True)
+        def model_switcher_confirm(event):
+            if self._model_switcher_state:
+                aliases = self._model_switcher_state.get("aliases", [])
+                selected = self._model_switcher_state.get("selected", 0)
+                self._model_switcher_state = None
+                if 0 <= selected < len(aliases):
+                    alias_name = aliases[selected][0]
+                    self.process_command(f"/model {alias_name}")
+                event.app.invalidate()
+
+        @kb.add('escape', filter=Condition(lambda: bool(self._model_switcher_state)), eager=True)
+        def model_switcher_escape(event):
+            self._model_switcher_state = None
             event.app.invalidate()
 
         # Number keys for quick approval selection (1-9, 0 for 10th item)
@@ -17538,7 +17614,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # Buffer.auto_up/auto_down handle both: cursor movement when multi-line,
         # history browsing when on the first/last line (or single-line input).
         _normal_input = Condition(
-            lambda: not self._clarify_state and not self._approval_state and not self._slash_confirm_state and not self._sudo_state and not self._secret_state and not self._model_picker_state
+            lambda: not self._clarify_state and not self._approval_state and not self._slash_confirm_state and not self._sudo_state and not self._secret_state and not self._model_picker_state and not self._model_switcher_state
         )
 
         def _recall_without_recollapse(buf, move):
@@ -18764,6 +18840,46 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             filter=Condition(lambda: cli_ref._model_picker_state is not None),
         )
 
+        # --- Ctrl+E Quick Model Switcher display ---
+        def _get_model_switcher_display():
+            state = cli_ref._model_switcher_state
+            if not state:
+                return []
+            aliases = state.get("aliases", [])
+            if not aliases:
+                return []
+            selected = state.get("selected", 0)
+            
+            lines = []
+            box_width = max(48, min(80, cli_ref._get_tui_terminal_width() - 4))
+            title = " ⚡ Quick Model Switch (Ctrl+E / Enter / Esc) "
+            lines.append(('class:clarify-border', '╭─ '))
+            lines.append(('class:clarify-title', title))
+            lines.append(('class:clarify-border', ' ' + ('─' * max(0, box_width - len(title) - 3)) + '╮\n'))
+            
+            # Render horizontal pills
+            pills = []
+            for i, (alias_name, model_id, prov) in enumerate(aliases):
+                if i == selected:
+                    pills.append(('class:clarify-selected', f" ▶ {i+1}. {alias_name} ({model_id[:18]}) ◀ "))
+                else:
+                    pills.append(('class:clarify-choice', f" [ {i+1}. {alias_name} ] "))
+                pills.append(('', ' '))
+            
+            lines.append(('class:clarify-border', '│ '))
+            lines.extend(pills)
+            lines.append(('class:clarify-border', '\n'))
+            lines.append(('class:clarify-border', '╰' + ('─' * box_width) + '╯\n'))
+            return lines
+
+        model_switcher_widget = ConditionalContainer(
+            Window(
+                FormattedTextControl(_get_model_switcher_display),
+                wrap_lines=False,
+            ),
+            filter=Condition(lambda: cli_ref._model_switcher_state is not None),
+        )
+
         # Horizontal rules above and below the input.
         # On narrow/mobile terminals we keep the top separator for structure but
         # hide the bottom one to recover a full row for conversation content.
@@ -18868,6 +18984,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                     slash_confirm_widget=slash_confirm_widget,
                     clarify_widget=clarify_widget,
                     model_picker_widget=model_picker_widget,
+                    model_switcher_widget=model_switcher_widget,
                     spinner_widget=spinner_widget,
                     spacer=spacer,
                     status_bar=status_bar,
