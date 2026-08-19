@@ -7056,11 +7056,18 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
 
             frags = self._right_align_status_title_fragments(frags, session_title, width)
 
-            total_width = sum(self._status_bar_display_width(text) for _, text in frags)
-            if total_width > width:
-                plain_text = "".join(text for _, text in frags)
-                trimmed = self._trim_status_bar_text(plain_text, width)
-                return [("class:status-bar", trimmed)]
+            # Line 1: Primary Status Bar (Model, Context, Mode, Timer, Stash, Battery)
+            # Line 2: Secondary Path & Workspace Bar (Folder path + Session info)
+            folder_name = os.path.basename(os.getcwd()) or "/"
+            full_cwd = os.getcwd()
+            # If line 2 is enabled, we append newline with styled path line
+            path_frags = [
+                ("class:status-bar", "\n"),
+                ("class:status-bar-dim", " 📁 "),
+                ("class:status-bar-strong", f"{folder_name}"),
+                ("class:status-bar-dim", f" ({full_cwd})"),
+            ]
+            frags.extend(path_frags)
             return frags
         except Exception:
             return [("class:status-bar", f" {self._build_status_bar_text()} ")]
@@ -18985,15 +18992,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         status_bar = ConditionalContainer(
             Window(
                 content=FormattedTextControl(lambda: cli_ref._get_status_bar_fragments()),
-                height=1,
-                # Prevent fragments that overflow the terminal width from
-                # wrapping onto a second line, which causes the status bar to
-                # appear duplicated (one full + one partial row) during long
-                # sessions, especially on SSH where shutil.get_terminal_size
-                # may return stale values.  _get_status_bar_fragments now reads
-                # width from prompt_toolkit's own output object, so fragments
-                # will always fit; wrap_lines=False is the belt-and-suspenders
-                # guard against any future width mismatch.
+                height=2,
                 wrap_lines=False,
             ),
             filter=Condition(
