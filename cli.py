@@ -17524,7 +17524,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # --- Ctrl+E Quick Model Switcher keybindings ---
         @kb.add('c-e')
         def handle_ctrl_e_model_switcher(event):
-            """Ctrl+E: Quick model switcher (Alt+Tab style live rotation & auto-pick on release)."""
+            """Ctrl+E: Quick model switcher (Press Ctrl+E to rotate, Enter to confirm, Esc to cancel)."""
             aliases = self._get_available_model_aliases()
             if not aliases:
                 self.process_command("/model")
@@ -17540,30 +17540,11 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 self._model_switcher_state = {
                     "aliases": aliases,
                     "selected": cur_idx if cur_idx < len(aliases) else 0,
-                    "last_e_time": time.time(),
                 }
             else:
                 cur = self._model_switcher_state.get("selected", 0)
                 self._model_switcher_state["selected"] = (cur + 1) % len(aliases)
-                self._model_switcher_state["last_e_time"] = time.time()
 
-            # Schedule auto-confirm timer (0.8s idle confirms choice)
-            def _auto_confirm_timer(scheduled_time):
-                time.sleep(0.75)
-                if self._model_switcher_state and self._model_switcher_state.get("last_e_time") == scheduled_time:
-                    try:
-                        al = self._model_switcher_state.get("aliases", [])
-                        sel = self._model_switcher_state.get("selected", 0)
-                        self._model_switcher_state = None
-                        if 0 <= sel < len(al):
-                            target_alias = al[sel][0]
-                            self.process_command(f"/model {target_alias}")
-                        event.app.invalidate()
-                    except Exception:
-                        pass
-
-            th = threading.Thread(target=_auto_confirm_timer, args=(self._model_switcher_state["last_e_time"],), daemon=True)
-            th.start()
             event.app.invalidate()
 
         @kb.add('left', filter=Condition(lambda: bool(self._model_switcher_state)))
@@ -18895,7 +18876,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             
             # Footer hint row
             _append_blank_panel_line(lines, 'class:clarify-border', box_width)
-            hint_text = "Release Ctrl to select  •  Press Esc to cancel"
+            hint_text = "Press Ctrl+E to rotate  •  Enter to confirm  •  Esc to cancel"
             _append_panel_line(lines, 'class:clarify-border', 'class:clarify-hint', hint_text, box_width)
             lines.append(('class:clarify-border', '╰' + ('─' * box_width) + '╯\n'))
             return lines
