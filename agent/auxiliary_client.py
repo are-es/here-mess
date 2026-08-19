@@ -82,11 +82,28 @@ _OPENAI_CLS_CACHE: Optional[type] = None
 
 
 def _load_openai_cls() -> type:
-    """Import and cache ``openai.OpenAI``."""
+    """Import and cache ``openai.OpenAI``, with auto-fallback to project venv site-packages."""
     global _OPENAI_CLS_CACHE
     if _OPENAI_CLS_CACHE is None:
-        from openai import OpenAI as _cls
-        _OPENAI_CLS_CACHE = _cls
+        try:
+            from openai import OpenAI as _cls
+            _OPENAI_CLS_CACHE = _cls
+        except ModuleNotFoundError:
+            # Fallback: probe virtual environment site-packages if running outside venv
+            import sys
+            from pathlib import Path
+            venv_candidates = [
+                Path(__file__).resolve().parent.parent / ".venv" / "lib",
+                Path("/home/dolvin/here-mess/.venv/lib"),
+                Path("/mnt/hdd/venv/lib"),
+            ]
+            for venv_lib in venv_candidates:
+                if venv_lib.is_dir():
+                    for sp in venv_lib.glob("python*/site-packages"):
+                        if sp.is_dir() and str(sp) not in sys.path:
+                            sys.path.insert(0, str(sp))
+            from openai import OpenAI as _cls
+            _OPENAI_CLS_CACHE = _cls
     return _OPENAI_CLS_CACHE
 
 
