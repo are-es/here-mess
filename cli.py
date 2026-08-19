@@ -18857,11 +18857,11 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             lines.append(('class:clarify-title', title))
             lines.append(('class:clarify-border', ' ' + ('─' * max(0, box_width - len(title) - 3)) + '╮\n'))
             
-            # Render horizontal pills
+            # Render horizontal pills (clean alias names only)
             pills = []
             for i, (alias_name, model_id, prov) in enumerate(aliases):
                 if i == selected:
-                    pills.append(('class:clarify-selected', f" ▶ {i+1}. {alias_name} ({model_id[:18]}) ◀ "))
+                    pills.append(('class:clarify-selected', f" ▶ {i+1}. {alias_name} ◀ "))
                 else:
                     pills.append(('class:clarify-choice', f" [ {i+1}. {alias_name} ] "))
                 pills.append(('', ' '))
