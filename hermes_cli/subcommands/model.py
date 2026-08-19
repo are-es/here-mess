@@ -60,3 +60,25 @@ def build_model_parser(subparsers, *, cmd_model: Callable) -> None:
         help="Disable TLS verification for Nous login (testing only)",
     )
     model_parser.set_defaults(func=cmd_model)
+
+    # Subcommand: hermes model alias (or hermes alias)
+    model_subparsers = model_parser.add_subparsers(dest="model_subcommand")
+    alias_subparser = model_subparsers.add_parser(
+        "alias",
+        aliases=["aliases"],
+        help="Manage interactive model aliases (dashboard + create)",
+    )
+    alias_subparser.set_defaults(func=lambda args: _dispatch_alias_dashboard(args))
+
+    # Also register top-level 'alias' for convenience
+    top_alias_parser = subparsers.add_parser(
+        "alias",
+        aliases=["aliases"],
+        help="Interactive model alias manager",
+    )
+    top_alias_parser.set_defaults(func=lambda args: _dispatch_alias_dashboard(args))
+
+
+def _dispatch_alias_dashboard(args=None):
+    from hermes_cli.alias_cmd import interactive_alias_dashboard
+    interactive_alias_dashboard(args=args)
