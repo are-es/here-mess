@@ -77,9 +77,20 @@ def verify_ca_bundle() -> None:
         logger.debug("SSL CA bundle guard skipped via HERMES_SKIP_SSL_GUARD")
         return
 
+    # Clean up stale inherited CA env vars if the path points to old directory
     for env_var in _CA_BUNDLE_ENV_VARS:
         value = os.getenv(env_var)
         if value:
+            p = Path(value).expanduser()
+            if not p.exists():
+                try:
+                    import certifi
+                    curr_certifi = certifi.where()
+                    if os.path.isfile(curr_certifi):
+                        os.environ[env_var] = str(curr_certifi)
+                        value = str(curr_certifi)
+                except Exception:
+                    pass
             _validate_bundle_path(env_var, value)
 
     try:
