@@ -169,9 +169,10 @@ def handle_codemaps(args: Dict[str, Any], **kwargs) -> str:
         note = str(args.get("note", "")).strip()
         if not note:
             return "Error: 'note' argument is required for memory_save."
-        target_dir = existing_dir or get_target_codemaps_dir(cwd)
-        target_dir.mkdir(parents=True, exist_ok=True)
-        mem_file = target_dir / "memory.md"
+        # Always write to root workspace memory (.ares/memory.md or ./memory.md)
+        ares_dir = cwd / ".ares"
+        ares_dir.mkdir(parents=True, exist_ok=True)
+        mem_file = ares_dir / "memory.md"
         content = mem_file.read_text(encoding='utf-8') if mem_file.is_file() else "# Project Memory\n\n"
         content += f"- {note}\n"
         mem_file.write_text(content, encoding='utf-8')

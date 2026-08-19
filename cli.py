@@ -17524,16 +17524,14 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         # --- Ctrl+E Quick Model Switcher keybindings ---
         @kb.add('c-e')
         def handle_ctrl_e_model_switcher(event):
-            """Ctrl+E: Quick model switcher (Alt+Tab style rotation)."""
+            """Ctrl+E: Quick model switcher (Alt+Tab style live rotation & auto-pick on release)."""
             aliases = self._get_available_model_aliases()
             if not aliases:
-                # If no aliases configured, open standard model picker
                 self.process_command("/model")
                 event.app.invalidate()
                 return
 
             if self._model_switcher_state is None:
-                # Find index matching current model if possible
                 cur_idx = 0
                 for i, (name, mid, prov) in enumerate(aliases):
                     if mid == self.model or name == self.model:
@@ -17542,12 +17540,30 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                 self._model_switcher_state = {
                     "aliases": aliases,
                     "selected": cur_idx if cur_idx < len(aliases) else 0,
+                    "last_e_time": time.time(),
                 }
             else:
-                # Rotate to next alias (Alt+Tab cycle)
                 cur = self._model_switcher_state.get("selected", 0)
                 self._model_switcher_state["selected"] = (cur + 1) % len(aliases)
+                self._model_switcher_state["last_e_time"] = time.time()
 
+            # Schedule auto-confirm timer (0.8s idle confirms choice)
+            def _auto_confirm_timer(scheduled_time):
+                time.sleep(0.75)
+                if self._model_switcher_state and self._model_switcher_state.get("last_e_time") == scheduled_time:
+                    try:
+                        al = self._model_switcher_state.get("aliases", [])
+                        sel = self._model_switcher_state.get("selected", 0)
+                        self._model_switcher_state = None
+                        if 0 <= sel < len(al):
+                            target_alias = al[sel][0]
+                            self.process_command(f"/model {target_alias}")
+                        event.app.invalidate()
+                    except Exception:
+                        pass
+
+            th = threading.Thread(target=_auto_confirm_timer, args=(self._model_switcher_state["last_e_time"],), daemon=True)
+            th.start()
             event.app.invalidate()
 
         @kb.add('left', filter=Condition(lambda: bool(self._model_switcher_state)))
@@ -18841,7 +18857,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             filter=Condition(lambda: cli_ref._model_picker_state is not None),
         )
 
-        # --- Ctrl+E Quick Model Switcher display ---
+        # --- Ctrl+E Quick Model Switcher display (Modal Card) ---
         def _get_model_switcher_display():
             state = cli_ref._model_switcher_state
             if not state:
@@ -18852,24 +18868,35 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             selected = state.get("selected", 0)
             
             lines = []
-            box_width = max(48, min(80, cli_ref._get_tui_terminal_width() - 4))
-            title = " ⚡ Quick Model Switch (Ctrl+E / Enter / Esc) "
+            box_width = max(54, min(80, cli_ref._get_tui_terminal_width() - 4))
+            title = " ⚡ Model Switcher (Hold Ctrl + Press E to rotate) "
+            
+            # Modal Card Header
             lines.append(('class:clarify-border', '╭─ '))
             lines.append(('class:clarify-title', title))
             lines.append(('class:clarify-border', ' ' + ('─' * max(0, box_width - len(title) - 3)) + '╮\n'))
             
-            # Render horizontal pills (clean alias names only)
-            pills = []
-            for i, (alias_name, model_id, prov) in enumerate(aliases):
-                if i == selected:
-                    pills.append(('class:clarify-selected', f" ▶ {i+1}. {alias_name} ◀ "))
-                else:
-                    pills.append(('class:clarify-choice', f" [ {i+1}. {alias_name} ] "))
-                pills.append(('', ' '))
+            # Blank padding row
+            _append_blank_panel_line(lines, 'class:clarify-border', box_width)
             
-            lines.append(('class:clarify-border', '│ '))
-            lines.extend(pills)
-            lines.append(('class:clarify-border', '\n'))
+            # List of model cards
+            for i, (alias_name, model_id, prov) in enumerate(aliases):
+                is_sel = (i == selected)
+                border_char = "▶" if is_sel else " "
+                prov_str = f"({prov})" if prov else ""
+                
+                # Card row styling
+                if is_sel:
+                    item_text = f"  {border_char} [{i+1}] {alias_name.upper()}  {prov_str}  —  {model_id}"
+                    _append_panel_line(lines, 'class:clarify-border', 'class:clarify-selected', item_text, box_width)
+                else:
+                    item_text = f"    [{i+1}] {alias_name}  {prov_str}"
+                    _append_panel_line(lines, 'class:clarify-border', 'class:clarify-choice', item_text, box_width)
+            
+            # Footer hint row
+            _append_blank_panel_line(lines, 'class:clarify-border', box_width)
+            hint_text = "Release Ctrl to select  •  Press Esc to cancel"
+            _append_panel_line(lines, 'class:clarify-border', 'class:clarify-hint', hint_text, box_width)
             lines.append(('class:clarify-border', '╰' + ('─' * box_width) + '╯\n'))
             return lines
 

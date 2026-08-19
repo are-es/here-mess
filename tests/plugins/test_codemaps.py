@@ -30,10 +30,10 @@ def test_code_maps_scan_and_resolve(tmp_path):
         q_res = handle_codemaps({"action": "query", "query": "my_app"})
         assert "my_app" in q_res
 
-        # 4. Test memory_save action
+        # 4. Test memory_save action (writes to root .ares/memory.md)
         m_res = handle_codemaps({"action": "memory_save", "note": "Use port 8080"})
         assert "Saved architectural note" in m_res
-        assert "Use port 8080" in (found_dir / "memory.md").read_text()
+        assert "Use port 8080" in (tmp_path / ".ares" / "memory.md").read_text()
 
         # 5. Test update action with no changes
         u_res = handle_codemaps({"action": "update"})
