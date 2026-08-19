@@ -15,3 +15,7 @@
   - `tools/delegate_tool.py` enforces Strict Path Scoping: subagents only write within specific target paths passed by Orchestrator.
 - **Git Commit & Push Rule**:
   - Strict explicit user approval required before any `git commit` or `git push`.
+- **Status Bar & UI Ergonomics**:
+  - Frameless vertical height meter (` ▂▃▄▅▆▇█`) for context length monitoring.
+  - Quick in-place `/restart` slash command with automatic session resume (`--resume <id>`).
+  - Modal card model switcher for `Ctrl+E` with clean alias names and deterministic Enter/Esc confirmation.
