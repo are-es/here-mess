@@ -564,22 +564,18 @@ def _run_agent_tool_execution_middleware(
     })
 
     def _is_plan_allowed_write(fname: str, fargs: dict) -> bool:
-        """Allow write_file and patch in PLAN mode ONLY for PRD, roadmap, and memory files."""
+        """Allow write_file and patch in PLAN mode ONLY for .ares workspace and plan files."""
         if fname not in ("write_file", "patch"):
             return False
         path_str = str(fargs.get("path", "") or "").lower().replace("\\", "/")
         if not path_str:
             return False
-        # 1. Feature workspace paths (.hermes/<feat>/prd/*, roadmap/*, memory.md)
-        if "/.hermes/" in path_str or path_str.startswith(".hermes/"):
-            if "/prd/" in path_str or "/roadmap/" in path_str or path_str.endswith("memory.md") or path_str.endswith(".md"):
-                return True
-        # 2. Local dot-plans or .ares workspace
+        # 1. Primary .ares workspace (.ares/prd/**, roadmap/**, preview/**, memoryan.md, memory.md)
         if "/.ares/" in path_str or path_str.startswith(".ares/") or "/.plans/" in path_str or path_str.startswith(".plans/"):
             return True
-        # 3. Root standard plan/roadmap markdown files
+        # 2. Root standard plan/roadmap markdown files
         allowed_exact_filenames = (
-            "plan.md", "prd.md", "roadmap.md", "requirements.md", "tasks.md", "technical.md"
+            "plan.md", "prd.md", "roadmap.md", "requirements.md", "tasks.md", "technical.md", "memoryan.md", "memory.md"
         )
         if any(path_str.endswith(f) or path_str.endswith(f".{f}") for f in allowed_exact_filenames):
             return True
