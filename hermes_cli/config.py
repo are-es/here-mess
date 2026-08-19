@@ -1801,21 +1801,29 @@ def get_custom_provider_context_length(
         entry_url = normalize_route_base_url(entry.get("base_url"))
         if not entry_url or entry_url != target_url:
             continue
+        # 1. Per-model context_length override
         models = entry.get("models")
-        if not isinstance(models, dict):
-            continue
-        model_cfg = models.get(model)
-        if not isinstance(model_cfg, dict):
-            continue
-        raw_ctx = model_cfg.get("context_length")
-        if raw_ctx is None:
-            continue
-        try:
-            ctx = int(raw_ctx)
-        except (TypeError, ValueError):
-            continue
-        if ctx > 0:
-            return ctx
+        if isinstance(models, dict):
+            model_cfg = models.get(model)
+            if isinstance(model_cfg, dict):
+                raw_ctx = model_cfg.get("context_length")
+                if raw_ctx is not None:
+                    try:
+                        ctx = int(raw_ctx)
+                        if ctx > 0:
+                            return ctx
+                    except (TypeError, ValueError):
+                        pass
+
+        # 2. Provider-level default context_length override
+        prov_ctx = entry.get("default_context_length") or entry.get("context_length")
+        if prov_ctx is not None:
+            try:
+                p_ctx = int(prov_ctx)
+                if p_ctx > 0:
+                    return p_ctx
+            except (TypeError, ValueError):
+                pass
     return None
 
 

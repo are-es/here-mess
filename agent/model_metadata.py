@@ -3001,6 +3001,20 @@ def get_model_context_length(
                     return length
             # Same silent-256K bug class as the step-9 fallback below —
             # warn here too so custom/local endpoints aren't left invisible.
+            # Check global agent.default_context_length before hard default
+            try:
+                from hermes_cli import config as _hermes_config
+                _loader = getattr(_hermes_config, "load_config_readonly", None) or getattr(_hermes_config, "load_config", None)
+                if _loader:
+                    _cfg = _loader()
+                    _agent_def_ctx = (_cfg.get("agent") or {}).get("default_context_length")
+                    if _agent_def_ctx is not None:
+                        _def_val = int(_agent_def_ctx)
+                        if _def_val > 0:
+                            return _def_val
+            except Exception:
+                pass
+
             _warn_context_length_fallback(model, base_url)
             return DEFAULT_FALLBACK_CONTEXT
 
@@ -3175,9 +3189,20 @@ def get_model_context_length(
         if default_model in model_lower:
             return length
 
-    # 9. Default fallback — warn (deduped per model+endpoint) so
-    #    small-context models don't silently get 256K. See
-    #    _warn_context_length_fallback for rationale.
+    # 9. Default fallback — check agent.default_context_length in config.yaml, then hard default
+    try:
+        from hermes_cli import config as _hermes_config
+        _loader = getattr(_hermes_config, "load_config_readonly", None) or getattr(_hermes_config, "load_config", None)
+        if _loader:
+            _cfg = _loader()
+            _agent_def_ctx = (_cfg.get("agent") or {}).get("default_context_length")
+            if _agent_def_ctx is not None:
+                _def_val = int(_agent_def_ctx)
+                if _def_val > 0:
+                    return _def_val
+    except Exception:
+        pass
+
     _warn_context_length_fallback(model, base_url)
     return DEFAULT_FALLBACK_CONTEXT
 
