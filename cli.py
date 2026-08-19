@@ -16583,6 +16583,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
     def _build_tui_layout_children(
         self,
         *,
+        top_header_widget=None,
         sudo_widget,
         secret_widget,
         approval_widget,
@@ -16608,6 +16609,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         """
         return [
             item for item in [
+                top_header_widget,
                 Window(height=0),
                 sudo_widget,
                 secret_widget,
@@ -18898,6 +18900,47 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             filter=Condition(lambda: cli_ref._model_switcher_state is not None),
         )
 
+        # --- Persistent Top Header Strip ---
+        def _get_top_header_display():
+            term_w = max(40, cli_ref._get_tui_terminal_width())
+            cwd_str = os.path.basename(os.getcwd()) or "/"
+            title_str = cli_ref._get_status_bar_session_title() or "New Session"
+            mode_str = "PLAN" if getattr(cli_ref, "_interaction_mode", "BUILD") == "PLAN" else "BUILD"
+            
+            # Left: ARES + Folder path
+            left_part = f" ⚡ ARES  │  📁 {cwd_str} "
+            # Right: Session title + Mode pill
+            right_part = f" 💬 {title_str}  [{mode_str}] "
+            
+            left_len = len(left_part)
+            right_len = len(right_part)
+            
+            # Truncate title if terminal is narrow
+            if left_len + right_len + 4 > term_w:
+                avail = max(10, term_w - left_len - 14)
+                if len(title_str) > avail:
+                    title_str = title_str[:avail-2] + "…"
+                right_part = f" 💬 {title_str}  [{mode_str}] "
+                right_len = len(right_part)
+            
+            pad = max(0, term_w - (left_len + right_len + 2))
+            
+            mode_style = "class:status-bar-good" if mode_str == "BUILD" else "class:status-bar-warn"
+            return [
+                ("class:clarify-border", "╭─"),
+                ("class:clarify-title", left_part),
+                ("class:clarify-border", "─" * pad),
+                ("class:clarify-desc", f" 💬 {title_str} "),
+                (mode_style, f" [{mode_str}] "),
+                ("class:clarify-border", "─╮\n"),
+            ]
+
+        top_header_widget = Window(
+            FormattedTextControl(_get_top_header_display),
+            height=1,
+            wrap_lines=False,
+        )
+
         # Horizontal rules above and below the input.
         # On narrow/mobile terminals we keep the top separator for structure but
         # hide the bottom one to recover a full row for conversation content.
@@ -18996,6 +19039,7 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         layout = Layout(
             HSplit(
                 self._build_tui_layout_children(
+                    top_header_widget=top_header_widget,
                     sudo_widget=sudo_widget,
                     secret_widget=secret_widget,
                     approval_widget=approval_widget,
