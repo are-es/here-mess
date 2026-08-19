@@ -19,19 +19,18 @@ Instead of wasting thousands of tokens reading raw source files one by one with 
 
 ### Phase 1: Project Discovery & Map Check (Cold Start)
 Whenever you start a new task or explore a project:
-1. **Search for Existing Map**:
-   - Invoke `code_maps(action="scan")`.
-   - The tool will automatically perform a recursive search across the workspace (e.g. `./codemaps/`, `./.ares/codemaps/`, `./.hermes/<feature>/codemaps/`).
-2. **Evaluate Status**:
+1. **Search for Existing Map (Passive Read-Only)**:
+   - Check if a codemaps directory exists in the workspace (e.g. `./codemaps/`, `./.ares/codemaps/`, `./.hermes/<feature>/codemaps/`).
+   - You may call `code_maps(action="scan")` ONLY to discover existing maps.
+2. **Strict Generation Guardrails**:
    - **Case A: Map Already Exists**:
      - **DO NOT REBUILD OR SCAN RAW FILES**.
-     - Read the summary returned by the tool.
-     - Inspect `map.json` for symbol/function hierarchy or use `code_maps(action="query", query="...")` to locate specific methods.
-     - Read `memory.md` inside the codemaps directory to understand known bugs, gotchas, and architectural constraints.
-   - **Case B: No Map Exists & Codebase is Active**:
-     - If the project already contains source code files (`.py`, `.ts`, `.js`, `.go`, `.rs`, `.c`, etc.), let `code_maps(action="scan")` generate the initial map (`map.json`, `map.html`, `checksums.json`, `memory.md`).
-   - **Case C: Greenfield / Empty Project**:
-     - If the project is brand new and contains no source code yet, **SKIP MAP CREATION** and proceed directly with planning.
+     - Read the summary, inspect `map.json` / `memory.md`, or use `code_maps(action="query", query="...")`.
+   - **Case B: No Map Exists & No Explicit User Command**:
+     - **DO NOT AUTOMATICALLY CREATE A CODEMAPS DIRECTORY**.
+     - Continue your normal task using standard exploration tools. Do not pollute the repository with unrequested map files.
+   - **Case C: Explicit User Command (`/codemaps`, "bikin codemaps", "petakan project")**:
+     - Only when explicitly commanded by the user, invoke `code_maps(action="scan")` on an active codebase to generate `map.json`, `map.html`, `checksums.json`, and `memory.md`.
 
 ---
 
