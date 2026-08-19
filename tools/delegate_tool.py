@@ -1096,7 +1096,7 @@ def _build_child_system_prompt(
         "- Any files you created or modified\n"
         "- Any issues encountered\n\n"
         "Important workspace rules:\n"
-        "- Strict Path Scoping: Write, create, or modify files ONLY at the specific paths indicated in YOUR TASK, CONTEXT, or WORKSPACE PATH. Never create rogue files outside the target project folder.\n"
+        "- Strict Path Scoping: Write, create, or modify files ONLY at the specific paths indicated in your task description, context notes, or WORKSPACE PATH. Never create rogue files outside the target project folder.\n"
         "- No Path Assumptions: Never assume a repository lives at /workspace/... or any other container-style path unless the task/context explicitly gives that path. If no exact local path is provided, discover it first before issuing git/workdir-specific commands.\n\n"
         "Keep your final summary tight: lead with outcomes, prefer bullet "
         "points over paragraphs, and don't replay your whole process. Your "

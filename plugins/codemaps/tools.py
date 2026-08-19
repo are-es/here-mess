@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from plugins.codemaps.engine import build_code_map, compute_file_hash, scan_engine_files
+from plugins.codemaps.engine import build_code_map, compute_file_hash, scan_engine_files, IGNORED_DIRS
 from plugins.codemaps.visualizer import generate_map_html
 
 
