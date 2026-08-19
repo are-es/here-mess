@@ -82,15 +82,11 @@ def resolve_hermes_bin() -> Optional[str]:
     """Find the hermes entry point.
 
     Priority:
-      0. ~/.local/bin/hermes wrapper (ensures correct venv & python interpreter).
       1. ``sys.argv[0]`` if it resolves to a real executable.
       2. ``shutil.which("hermes")`` on PATH.
-      3. ``None`` → caller should fall back to ``python -m hermes_cli.main``.
+      3. ~/.local/bin/hermes wrapper (ensures correct venv & python interpreter).
+      4. ``None`` → caller should fall back to ``python -m hermes_cli.main``.
     """
-    local_bin = Path.home() / ".local" / "bin" / "hermes"
-    if local_bin.is_file() and os.access(local_bin, os.X_OK):
-        return str(local_bin)
-
     argv0 = sys.argv[0]
     _is_windows = sys.platform == "win32"
 
@@ -113,6 +109,10 @@ def resolve_hermes_bin() -> Optional[str]:
     path_bin = shutil.which("hermes")
     if path_bin:
         return path_bin
+
+    local_bin = Path.home() / ".local" / "bin" / "hermes"
+    if local_bin.is_file() and os.access(local_bin, os.X_OK):
+        return str(local_bin)
 
     return None
 
