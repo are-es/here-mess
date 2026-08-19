@@ -1027,9 +1027,10 @@ def build_welcome_banner(console: "Console", model: str, cwd: str,
 
     if os.getenv("HERMES_YOLO_MODE"):
         left_lines.append(f"[bold red]⚠ YOLO mode[/] [dim {dim}]— all approval prompts bypassed[/]")
-    left_lines.append(f"[dim {dim}]{cwd}[/]")
+    folder_name = os.path.basename(cwd) or cwd
+    left_lines.append(f"[bold {text}]📁 {folder_name}[/] [dim {dim}]({cwd})[/]")
     if session_id:
-        left_lines.append(f"[dim {session_color}]Session: {session_id}[/]")
+        left_lines.append(f"[dim {session_color}]💬 Session: {session_id[:8]}[/]")
     left_content = "\n".join(left_lines)
 
     right_lines = [f"[bold {accent}]Available Tools[/]"]

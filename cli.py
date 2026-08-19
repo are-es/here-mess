@@ -16583,7 +16583,6 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
     def _build_tui_layout_children(
         self,
         *,
-        top_header_widget=None,
         sudo_widget,
         secret_widget,
         approval_widget,
@@ -16609,7 +16608,6 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         """
         return [
             item for item in [
-                top_header_widget,
                 Window(height=0),
                 sudo_widget,
                 secret_widget,
@@ -19039,7 +19037,6 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         layout = Layout(
             HSplit(
                 self._build_tui_layout_children(
-                    top_header_widget=top_header_widget,
                     sudo_widget=sudo_widget,
                     secret_widget=secret_widget,
                     approval_widget=approval_widget,
