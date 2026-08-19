@@ -5937,10 +5937,16 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             return "class:status-bar-warn"
         return "class:status-bar-dim"
 
-    def _build_context_bar(self, percent_used: Optional[int], width: int = 10) -> str:
+    def _build_context_bar(self, percent_used: Optional[int], width: int = 1) -> str:
+        """Render visible vertical height meter ( ▂ ▃ ▄ ▅ ▆ ▇ █) based on context percent."""
         safe_percent = max(0, min(100, percent_used or 0))
-        filled = round((safe_percent / 100) * width)
-        return f"[{('█' * filled) + ('░' * max(0, width - filled))}]"
+        # 8-level vertical blocks: index 0 to 7
+        levels = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
+        if safe_percent == 0:
+            return "[_]"
+        # Map 1-100% smoothly across 8 vertical levels
+        idx = min(7, int((safe_percent / 100) * 8))
+        return f"[{levels[idx]}]"
 
     @staticmethod
     def _format_prompt_elapsed(prompt_start_time: Optional[float], prompt_duration: float, live: bool = False) -> str:
@@ -11463,6 +11469,11 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             ) is None:
                 return True  # confirmation cancelled — command handled, keep REPL alive
             self.new_session(title=title)
+        elif canonical == "restart":
+            print("\n🔄 Restarting Hermes CLI in-place...")
+            from hermes_cli.relaunch import relaunch
+            args = ["--resume", self.session_id] if getattr(self, "session_id", None) else []
+            relaunch(args)
         elif canonical == "resume":
             self._handle_resume_command(cmd_original)
         elif canonical == "sessions":
