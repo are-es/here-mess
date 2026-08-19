@@ -13,7 +13,8 @@ from typing import Dict, Any, List, Tuple, Set
 SUPPORTED_EXTENSIONS = {'.py', '.ts', '.tsx', '.js', '.jsx', '.go', '.rs', '.c', '.cpp', '.h', '.cs'}
 IGNORED_DIRS = {
     '.git', 'node_modules', 'dist', 'build', '__pycache__', '.venv', 'venv',
-    '.hermes-runtime', '.cargo', 'vendor', '.idea', '.vscode'
+    '.hermes-runtime', '.cargo', 'vendor', '.idea', '.vscode', '.ares', '.hermes',
+    'tests', 'test', 'fixtures', 'snapshots'
 }
 
 
