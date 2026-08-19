@@ -3067,7 +3067,8 @@ def invoke_tool(agent, function_name: str, function_args: dict, effective_task_i
         if not path_str:
             return False
         if "/.ares/" in path_str or path_str.startswith(".ares/") or "/.plans/" in path_str or path_str.startswith(".plans/"):
-            return True
+            if path_str.endswith(".md") or path_str.endswith(".html") or "/preview/" in path_str:
+                return True
         allowed_exact_filenames = (
             "plan.md", "prd.md", "roadmap.md", "requirements.md", "tasks.md", "technical.md", "memoryan.md", "memory.md"
         )

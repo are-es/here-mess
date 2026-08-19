@@ -15678,13 +15678,14 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
                         _mode_note = (
                             "[System: Current interaction mode: PLAN.\n"
                             "Plan mode is active for safe exploring, research, analysis, and architecture design. "
-                            "Modifying tools (write_file, patch, terminal commands that alter state) are disabled in this mode. "
-                            "Read-only tools (read_file, search_files, session_search, skill_view, skills_list) remain available.\n\n"
+                            "Modifying tools (write_file, patch, terminal commands that alter state) are disabled for source code in this mode. "
+                            "Writing is strictly permitted ONLY for planning artifacts under `.ares/<feature>/prd.md` and `.ares/<feature>/roadmap.md` (or root `prd.md`/`roadmap.md`).\n\n"
                             "PLAN mode guidelines:\n"
                             "- Answer user questions with critical analysis and concrete recommendations\n"
                             "- Explore and understand the codebase before formulating plans\n"
+                            "- Store feature planning strictly in 2 files: `.ares/<feature>/prd.md` and `.ares/<feature>/roadmap.md` (no memory files needed, handled by codemaps)\n"
                             "- Research and design architecture, workflows, and task roadmaps\n"
-                            "- Do not attempt to write code, edit files, or execute mutating actions directly]"
+                            "- Do not attempt to write or edit source code directly (switch to BUILD mode to implement)]"
                         )
                     else:
                         _mode_note = (

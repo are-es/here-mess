@@ -564,15 +564,16 @@ def _run_agent_tool_execution_middleware(
     })
 
     def _is_plan_allowed_write(fname: str, fargs: dict) -> bool:
-        """Allow write_file and patch in PLAN mode ONLY for .ares workspace and plan files."""
+        """Allow write_file and patch in PLAN mode ONLY for .ares/<feature>/prd.md, roadmap.md, and root plan files."""
         if fname not in ("write_file", "patch"):
             return False
         path_str = str(fargs.get("path", "") or "").lower().replace("\\", "/")
         if not path_str:
             return False
-        # 1. Primary .ares workspace (.ares/prd/**, roadmap/**, preview/**, memoryan.md, memory.md)
+        # 1. Feature-specific .ares workspace (.ares/<feature>/prd.md, roadmap.md, preview.html, preview/*)
         if "/.ares/" in path_str or path_str.startswith(".ares/") or "/.plans/" in path_str or path_str.startswith(".plans/"):
-            return True
+            if path_str.endswith(".md") or path_str.endswith(".html") or "/preview/" in path_str:
+                return True
         # 2. Root standard plan/roadmap markdown files
         allowed_exact_filenames = (
             "plan.md", "prd.md", "roadmap.md", "requirements.md", "tasks.md", "technical.md", "memoryan.md", "memory.md"
