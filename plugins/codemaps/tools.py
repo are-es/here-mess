@@ -36,17 +36,34 @@ def resolve_codemaps_dir(cwd: Path) -> Optional[Path]:
     return None
 
 
+def load_plugin_yaml_config() -> Dict[str, Any]:
+    """Load config section directly from plugins/codemaps/plugin.yaml."""
+    try:
+        import yaml
+        plugin_yaml = Path(__file__).parent / "plugin.yaml"
+        if plugin_yaml.is_file():
+            data = yaml.safe_load(plugin_yaml.read_text(encoding='utf-8'))
+            if isinstance(data, dict) and "config" in data and isinstance(data["config"], dict):
+                return data["config"]
+    except Exception:
+        pass
+    return {}
+
+
 def get_target_codemaps_dir(cwd: Path, config: Optional[Dict[str, Any]] = None) -> Path:
-    """Determine where to write new codemaps based on user config or defaults."""
-    from hermes_cli.config import load_config_readonly
-    cfg = config or load_config_readonly()
+    """Determine where to write new codemaps based on plugin.yaml config or defaults."""
+    plugin_cfg = load_plugin_yaml_config()
     
-    # Check agent.folder config (e.g. agent.folder: ".ares" or ".hermes/fork")
-    agent_cfg = cfg.get("agent", {}) if isinstance(cfg, dict) else {}
-    custom_folder = agent_cfg.get("folder") if isinstance(agent_cfg, dict) else None
+    # 1. First priority: plugin.yaml config.output_folder
+    custom_folder = plugin_cfg.get("output_folder")
+    
+    # 2. Second priority: passed config or global agent.folder
+    if not custom_folder and config:
+        agent_cfg = config.get("agent", {}) if isinstance(config, dict) else {}
+        custom_folder = agent_cfg.get("folder") if isinstance(agent_cfg, dict) else None
 
     if custom_folder:
-        clean_folder = custom_folder.strip().lstrip("/")
+        clean_folder = str(custom_folder).strip().lstrip("/")
         return cwd / clean_folder / "codemaps"
 
     return cwd / "codemaps"

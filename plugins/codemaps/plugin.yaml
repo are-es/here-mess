@@ -2,6 +2,13 @@ name: codemaps
 version: 1.0.0
 description: "Codebase architecture mapping, balloon graph visualization, and persistent project memory."
 author: are-es
+
+# Plugin Configuration Defaults (Can be customized directly here)
+config:
+  output_folder: ".ares"       # Target sub-folder (e.g. ".ares", ".hermes/fork", or "" for root ./codemaps)
+  auto_discover_depth: 5       # Max recursive search depth for finding existing maps
+  save_memory: true            # Auto-generate memory.md alongside AST graph
+
 tools:
   - name: code_maps
     description: "Discover project architecture, AST dependencies, symbol connections, and project memory. Actions: 'scan' (discover or build maps), 'update' (incremental diff sync), 'query' (ask relations between files/functions), 'memory_save' (record technical gotchas)."
