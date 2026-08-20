@@ -241,6 +241,14 @@ def _summarize_user_message(user_message: str) -> str:
     return strip_control_wrappers(text)
 
 
+# Common opening greetings/fillers that carry no task intent and should not generate session titles.
+_TRIVIAL_GREETINGS = frozenset({
+    "hi", "hello", "hey", "hai", "halo", "hei", "p", "test", "tes", "yo",
+    "ping", "siang", "pagi", "malam", "sore", "sup", "bro", "woi", "oy",
+    "assalamualaikum", "halo ares", "hai ares", "yo ares", "p ares",
+})
+
+
 def is_titleable_user_message(user_message: str) -> bool:
     """Return whether *user_message* carries real user intent to title from."""
     if not isinstance(user_message, str) or not user_message.strip():
@@ -249,7 +257,13 @@ def is_titleable_user_message(user_message: str) -> bool:
         if user_message.lstrip().startswith(prefix):
             return False
     clean = _summarize_user_message(user_message).strip().lower()
-    return bool(clean)
+    if not clean:
+        return False
+    # Strip punctuation and check against trivial greetings
+    clean_words = re.sub(r"[^\w\s]", "", clean).strip()
+    if clean_words in _TRIVIAL_GREETINGS:
+        return False
+    return True
 
 
 def derive_title(user_message: str) -> Optional[str]:
@@ -721,10 +735,11 @@ def maybe_auto_title(
 
     # Count the real questions behind us to detect the opening turn.
     user_msg_count = sum(1 for m in (conversation_history or []) if _is_real_user_turn(m))
-    if user_msg_count > 1 and not _session_is_untitled(session_db, session_id):
+    if not is_titleable_user_message(user_message):
         return
 
-    if not is_titleable_user_message(user_message):
+    # If the session is already titled and we're past the initial exploration turns, skip.
+    if user_msg_count > 3 and not _session_is_untitled(session_db, session_id):
         return
 
     # Config read comes after the cheap guards so the file isn't touched on
