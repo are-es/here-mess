@@ -600,6 +600,11 @@ export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
       return patchOverlayState({ sessions: true })
     }
 
+    // Ctrl+E alias for model picker — same behavior as Ctrl+O
+    if (isCtrl(key, ch, 'e')) {
+      return patchOverlayState({ modelPicker: true })
+    }
+
     // Ctrl+O opens the model picker without disturbing a typed draft — the
     // same overlay `/model` opens, but reachable without clearing what you've
     // typed to run the command. Works mid-stream: picking a model writes the
