@@ -162,6 +162,45 @@ def _is_write_denied(path: str) -> bool:
 ARES_TRASH_DIR_NAME = ".trash"
 
 
+def _load_trash_path_config() -> str:
+    """Raw ``files.trash_path`` config value, or ``""`` when unset/unreadable.
+
+    Split out from ``_trash_root`` so the resolution order is testable without
+    a config file on disk. Lazy import keeps this module importable without
+    the CLI layer.
+    """
+    try:
+        from hermes_cli.config import cfg_get, load_config_readonly
+
+        raw = cfg_get(load_config_readonly(), "files", "trash_path", default="")
+    except Exception:
+        return ""
+    return raw.strip() if isinstance(raw, str) else ""
+
+
+def _trash_root() -> Optional[str]:
+    """Absolute root every pre-write backup is mirrored under.
+
+    ``files.trash_path`` when set, otherwise ``<hermes home>/.trash`` — so
+    backups never litter a project tree (or show up in ``git status``) by
+    default, and they follow the active profile's home. Backups are
+    namespaced per project root basename inside the root, so two projects
+    with the same relative path can't overwrite each other.
+
+    Returns ``None`` only when neither source resolves (no config value and
+    no Hermes home), in which case backup is skipped rather than guessed.
+    """
+    configured = _load_trash_path_config()
+    if configured:
+        return os.path.abspath(os.path.expanduser(configured))
+    try:
+        from hermes_constants import get_hermes_home
+
+        return str(Path(get_hermes_home()) / ARES_TRASH_DIR_NAME)
+    except Exception:
+        return None
+
+
 def _find_root_for_path(path: str) -> Optional[str]:
     """Walk up from ``path`` to the nearest project root.
 
@@ -190,27 +229,41 @@ def _find_root_for_path(path: str) -> Optional[str]:
 def _workspace_trash_backup_path(path: str, timestamp: Optional[str] = None) -> Optional[str]:
     """Where ``path``'s pre-write copy belongs, or ``None`` if it isn't archived.
 
-    Finds the nearest git root above ``path`` and mirrors the root-relative
-    path under ``<root>/.trash/``.  ``paap/src/file.py`` inside
-    ``/mnt/hdd/ares-workspace`` archives to
-    ``/mnt/hdd/ares-workspace/.trash/paap/src/file-20260825T011451.py``.
+    Finds the nearest project root above ``path`` (see
+    ``_find_root_for_path``) and mirrors the root-relative path under the
+    trash root from ``_trash_root()``, namespaced by the project root's
+    basename.  By default that is ``<hermes home>/.trash``, so
+    ``<workspace>/paap/src/file.py`` archives to
+    ``~/.hermes/.trash/<workspace-name>/paap/src/file-20260825T011451.py``.
+    Setting ``files.trash_path`` moves the whole tree elsewhere.
 
-    Returns ``None`` for paths already inside ``.trash/`` (no backup-of-backup)
-    and for paths with no git-root ancestor.
+    Returns ``None`` for paths already inside the trash root (no
+    backup-of-backup) and for paths with no project-root ancestor.
     """
+    trash_root = _trash_root()
+    if not trash_root:
+        return None
+
+    # No backup-of-backup: anything already living under the trash root is
+    # itself an archived copy.
+    abs_path = os.path.abspath(path)
+    if abs_path == trash_root or abs_path.startswith(trash_root + os.sep):
+        return None
+
     root = _find_root_for_path(path)
     if not root:
         return None
     try:
-        rel = Path(os.path.abspath(path)).relative_to(root)
+        rel = Path(abs_path).relative_to(root)
     except ValueError:
         return None
-    parts = rel.parts
-    if not parts or parts[0] == ARES_TRASH_DIR_NAME:
+    if not rel.parts:
         return None
+
     stem, ext = os.path.splitext(rel.name)
     ts = timestamp or datetime.now().strftime("%Y%m%dT%H%M%S.%f")
-    return str(Path(root) / ARES_TRASH_DIR_NAME / rel.parent / f"{stem}-{ts}{ext}")
+    trash_base = Path(trash_root) / os.path.basename(root)
+    return str(trash_base / rel.parent / f"{stem}-{ts}{ext}")
 
 
 
@@ -1234,48 +1287,26 @@ class ShellFileOperations(FileOperations):
         return "'" + arg.replace("'", "'\"'\"'") + "'"
 
     def _backup_to_trash(self, path: str) -> Optional[str]:
-        """Back up an existing file to ``<root>/.trash/`` before overwrite.
+        """Back up an existing file to the trash root before overwrite.
 
-        Finds the project root via ``_find_root_for_path`` (nearest ``.git/``
-        or ``ARES_WORKSPACE_ROOT``) and mirrors the root-relative path under
-        ``<root>/.trash/``.  Each overwrite gets its own timestamped copy so
-        every version is recoverable.
+        Destination comes from ``_workspace_trash_backup_path``: the project
+        root's own ``.trash/`` mirror by default, or the single directory
+        configured via ``files.trash_path``.  Each overwrite gets its own
+        timestamped copy so every version is recoverable.
 
         Returns ``None`` on success or when backup is not needed (file is new,
-        outside any known root, or already inside .trash).
+        outside any known root, or already inside the trash root).
         """
-        root = _find_root_for_path(path)
-        if not root:
-            return None
-
         # Must be an existing file (not new)
         check_cmd = f"test -f {self._escape_shell_arg(path)}"
         check_result = self._exec(check_cmd)
         if check_result.exit_code != 0:
             return None
 
-        # Compute relative path from root
-        try:
-            resolved_path = os.path.realpath(path)
-            resolved_root = os.path.realpath(root)
-            rel_path = os.path.relpath(resolved_path, resolved_root)
-        except (OSError, ValueError):
+        backup_path = _workspace_trash_backup_path(path)
+        if not backup_path:
             return None
-
-        # Skip if already inside .trash
-        parts = Path(rel_path).parts
-        if not parts or parts[0] == ".trash":
-            return None
-
-        rel_dir = os.path.dirname(rel_path)
-        stem = os.path.splitext(os.path.basename(rel_path))[0]
-        ext = os.path.splitext(rel_path)[1]
-
-        ts = datetime.now().strftime("%Y%m%dT%H%M%S.%f")
-        backup_name = f"{stem}-{ts}{ext}"
-        trash_dir = os.path.join(resolved_root, ".trash")
-        backup_dir = os.path.join(trash_dir, rel_dir)
-        backup_path = os.path.join(backup_dir, backup_name)
+        backup_dir = os.path.dirname(backup_path)
 
         script = (
             f"mkdir -p {self._escape_shell_arg(backup_dir)} && "
@@ -1283,7 +1314,7 @@ class ShellFileOperations(FileOperations):
         )
         result = self._exec(script)
         if result.exit_code != 0:
-            return f"Failed to back up {path} to .trash: {result.stdout}"
+            return f"Failed to back up {path} to {backup_dir}: {result.stdout}"
 
         return None
 
