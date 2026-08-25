@@ -3,6 +3,16 @@ import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from 'reac
 import spinners, { type BrailleSpinnerName } from 'unicode-animations'
 
 import { THINKING_COT_MAX } from '../config/limits.js'
+
+/* Forward-square spinner: one filled cell (▰) sweeping strictly forward over
+ * empty cells (▱), no bounce. Fork feature — see forwardSquareSpinner.test. */
+export const FORWARD_SQUARE_WIDTH = 6
+
+export const FORWARD_SQUARE_FRAMES: readonly string[] = Array.from(
+  { length: FORWARD_SQUARE_WIDTH },
+  (_, i) => '▱'.repeat(i) + '▰' + '▱'.repeat(FORWARD_SQUARE_WIDTH - i - 1)
+)
+
 import { sectionMode } from '../domain/details.js'
 import {
   buildSubagentTree,
