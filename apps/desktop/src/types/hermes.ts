@@ -331,6 +331,8 @@ export interface HermesConfig {
     personality?: string
     skin?: string
     interim_assistant_messages?: boolean
+    /** Path to a custom turn-completion sound; empty uses the built-in cue. */
+    notify_sound?: string
     timestamps?: boolean
   }
   desktop?: {

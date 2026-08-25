@@ -284,6 +284,8 @@ export const applyDisplay = (
     indicatorStyle: normalizeIndicatorStyle(d.tui_status_indicator),
     inlineDiffs: d.inline_diffs !== false,
     mouseTracking: normalizeMouseTracking(d),
+    notifyPopup: d.notify_popup === true,
+    notifySound: typeof d.notify_sound === 'string' ? d.notify_sound : '',
     pasteCollapseLines: _pasteCollapseLinesFromConfig(cfg),
     pasteCollapseChars: _pasteCollapseCharsFromConfig(cfg),
     sections: resolveSections(d.sections),

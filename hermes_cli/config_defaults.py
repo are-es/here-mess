@@ -1352,6 +1352,30 @@ DEFAULT_CONFIG = {
         # dashboard. Set false to suppress the hint.
         "tui_agents_nudge": True,
         "bell_on_complete": False,
+        # Path to an audio file played when a turn finishes — the one knob for
+        # completion notifications across every surface (classic CLI, TUI,
+        # Desktop). Empty (default) keeps the existing behavior: surfaces fall
+        # back to the terminal bell above, and Desktop keeps its built-in
+        # synthesized cue.
+        #
+        # A configured sound REPLACES the bell rather than stacking with it.
+        # ~ and $VARS expand. Playback is fire-and-forget through whichever
+        # system player exists (paplay/pw-play/aplay/ffplay on Linux, afplay on
+        # macOS, PowerShell on Windows/WSL2); Desktop decodes the file itself.
+        # A missing file or absent player degrades to the bell silently, so a
+        # stale path can never break turn completion.
+        # HERMES_NOTIFY_SOUND overrides this for a single run.
+        "notify_sound": "",
+        # Show an OS desktop notification when a turn finishes, on every
+        # surface. Off by default: a popup per turn is noise while the user is
+        # already watching the terminal, so it has to be asked for.
+        #
+        # Independent of notify_sound above — sound only, popup only, both, or
+        # neither. Uses whatever notifier the OS provides (notify-send on
+        # Linux, terminal-notifier/osascript on macOS, PowerShell on
+        # Windows/WSL2); no notifier available means no popup, silently.
+        # HERMES_NOTIFY_POPUP overrides this for a single run.
+        "notify_popup": False,
         # Stream the model's reasoning/thinking live before the response.
         # Default ON: on thinking models the reasoning phase can run tens of
         # seconds, and with this off the user stares at a spinner the whole
@@ -2793,6 +2817,24 @@ DEFAULT_CONFIG = {
         # Env scrubbing (strips *_API_KEY, *_TOKEN, *_SECRET, ...) and the
         # tool whitelist apply identically in both modes.
         "mode": "project",
+    },
+
+    # File tool settings — write_file / patch behavior.
+    "files": {
+        # Where pre-write backups go. Every overwrite of an existing file
+        # copies the current bytes to a timestamped mirror BEFORE the new
+        # content lands, so an over-aggressive edit is always recoverable:
+        #   <trash root>/<project-name>/<relative path>/<stem>-<timestamp><ext>
+        # Project name/relative path come from the nearest .git/ ancestor
+        # (or ARES_WORKSPACE_ROOT).
+        #
+        # ""  (default) — <hermes home>/.trash, i.e. ~/.hermes/.trash. Keeps
+        #     backups out of project trees entirely, so they never show up in
+        #     `git status` and follow the active profile's home.
+        # "/abs/path" — use this directory as the trash root instead. Useful
+        #     for parking backups on a different disk. ~ expands. Files
+        #     already under the trash root are never re-backed up.
+        "trash_path": "",
     },
 
     # Tool Search (progressive disclosure for large tool surfaces).

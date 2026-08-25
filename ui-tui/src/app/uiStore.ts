@@ -25,6 +25,8 @@ const buildUiState = (): UiState => ({
   inlineDiffs: true,
   mouseTracking: MOUSE_TRACKING,
   notice: null,
+  notifyPopup: false,
+  notifySound: '',
   pasteCollapseLines: 5,
   pasteCollapseChars: 2000,
   sections: {},

@@ -336,6 +336,12 @@ export interface UiState {
   interactionMode: InteractionMode
   mouseTracking: MouseTrackingMode
   notice: Notice | null
+  // `display.notify_popup` — OS desktop notification when a turn ends.
+  // Independent of `notifySound`.
+  notifyPopup: boolean
+  // `display.notify_sound` — path to an audio file played when a turn ends.
+  // Empty falls back to the terminal bell (`bellOnComplete`).
+  notifySound: string
   pasteCollapseLines: number
   pasteCollapseChars: number
 

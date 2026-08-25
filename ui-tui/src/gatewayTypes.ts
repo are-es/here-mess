@@ -85,6 +85,17 @@ export interface ConfigDisplayConfig {
   focus_view?: boolean
   inline_diffs?: boolean
   mouse_tracking?: boolean | null | number | string
+  /**
+   * Show an OS desktop notification when a turn finishes. Independent of
+   * `notify_sound` — see `display.notify_popup` in config_defaults.py.
+   */
+  notify_popup?: boolean
+  /**
+   * Path to an audio file played when a turn finishes. Empty/absent falls
+   * back to the terminal bell (`bell_on_complete`). One knob shared by every
+   * Hermes surface — see `display.notify_sound` in config_defaults.py.
+   */
+  notify_sound?: string
   sections?: Record<string, string>
   show_cost?: boolean
   show_reasoning?: boolean

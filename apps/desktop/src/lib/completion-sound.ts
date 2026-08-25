@@ -2,6 +2,7 @@
 // Fourteen curated presets for A/B in Settings → Appearance. Default is variant 1.
 
 import { getAudioContext } from '@/lib/audio-context'
+import { playNotifySoundFile } from '@/lib/notify-sound-file'
 import { ownsAmbientCue } from '@/store/ambient'
 import { $completionSoundVariantId, resolveCompletionSoundVariantId } from '@/store/completion-sound'
 import { $hapticsMuted } from '@/store/haptics'
@@ -427,12 +428,22 @@ export function previewCompletionSound(variantId?: number) {
 // (the session id) so only one window beeps when several are open — the mute
 // check runs first, so a muted window never claims the cue out from under an
 // audible peer.
+//
+// `display.notify_sound` wins when set: the user named a file, so the
+// synthesized bank stands down. An unreadable path or a blocked autoplay falls
+// through to the variant rather than going silent.
 export function playCompletionSound(dedupeKey?: string) {
   if ($hapticsMuted.get()) {
     return
   }
 
-  const play = () => playVariant($completionSoundVariantId.get())
+  const play = () => {
+    void playNotifySoundFile().then(played => {
+      if (!played) {
+        playVariant($completionSoundVariantId.get())
+      }
+    })
+  }
 
   if (!dedupeKey) {
     return play()

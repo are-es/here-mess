@@ -5,6 +5,7 @@ import { getHermesConfig, getHermesConfigDefaults } from '@/hermes'
 import { BUILTIN_PERSONALITIES, normalizePersonalityValue, personalityNamesFromConfig } from '@/lib/chat-runtime'
 import { normalize } from '@/lib/text'
 import { setDisplayTimestampsFromConfig } from '@/store/display-timestamps'
+import { setNotifySoundPathFromConfig } from '@/store/notify-sound'
 import {
   getComposerSelectionGeneration,
   getCurrentModelSource,
@@ -111,6 +112,7 @@ export function useHermesConfig({ activeSessionIdRef }: HermesConfigOptions) {
         setVoiceMaxRecordingSeconds(recordingLimit(config.voice?.max_recording_seconds))
         setSttEnabled(config.stt?.enabled !== false)
         setDisplayTimestampsFromConfig(config.display?.timestamps)
+        setNotifySoundPathFromConfig(config.display?.notify_sound)
         setTerminalFontFamilyFromConfig(config.terminal?.font_family)
         applyAutoSpeakFromConfig(config)
         applyVoiceStopPhraseFromConfig(config)

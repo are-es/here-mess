@@ -5090,6 +5090,9 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
         self.resume_display = CLI_CONFIG["display"].get("resume_display", "full")
         # bell_on_complete: play terminal bell (\a) when agent finishes a response
         self.bell_on_complete = CLI_CONFIG["display"].get("bell_on_complete", False)
+        # notify_sound: path to an audio file played instead of the bell when a
+        # turn finishes. Empty = bell only. Resolved per-play (not cached here)
+        # so editing config.yaml takes effect without a restart.
         # show_reasoning: display model thinking/reasoning before the response
         self.show_reasoning = CLI_CONFIG["display"].get("show_reasoning", True)
         # reasoning_full: when reasoning display is on, print the post-response
@@ -17151,11 +17154,14 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin, CLIBillingMixin):
             except Exception:
                 pass
 
-            # Play terminal bell when agent finishes (if enabled).
-            # Works over SSH — the bell propagates to the user's terminal.
-            if self.bell_on_complete:
-                sys.stdout.write("\a")
-                sys.stdout.flush()
+            # Signal turn completion: the configured notify sound when set,
+            # otherwise the terminal bell (which propagates over SSH).
+            try:
+                from agent.notify_sound import notify_turn_complete
+
+                notify_turn_complete(bell=self.bell_on_complete)
+            except Exception:
+                logger.debug("turn-complete notification failed", exc_info=True)
 
             # Notify when iteration budget was hit
             if result and not result.get("completed") and not result.get("interrupted"):

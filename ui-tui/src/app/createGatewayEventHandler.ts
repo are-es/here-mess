@@ -16,6 +16,7 @@ import type {
 import { billingDialogCopy } from '../lib/billingDialog.js'
 import { relativeLuminance } from '../lib/color.js'
 import { isTodoDone } from '../lib/liveProgress.js'
+import { notifyTurnComplete } from '../lib/notifySound.js'
 import { openExternalUrl } from '../lib/openExternalUrl.js'
 import { rpcErrorMessage } from '../lib/rpc.js'
 import { topLevelSubagents } from '../lib/subagentTree.js'
@@ -1432,8 +1433,15 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
           // Pet beat: celebrate a finished plan, otherwise a clean-finish wave.
           flashPet(isTodoDone(getTurnState().todos) ? 'jump' : 'wave')
 
-          if (bellOnComplete && stdout?.isTTY) {
-            stdout.write('\x07')
+          const ui = getUiState()
+
+          if (bellOnComplete || ui.notifySound || ui.notifyPopup) {
+            notifyTurnComplete({
+              bellOnComplete,
+              notifyPopup: ui.notifyPopup,
+              notifySound: ui.notifySound,
+              stdout
+            })
           }
         }
 

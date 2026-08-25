@@ -2302,10 +2302,17 @@ class CLICommandsMixin:
                 else:
                     _cprint("  (No response generated)")
 
-                # Play bell if enabled
-                if self.bell_on_complete:
-                    sys.stdout.write("\a")
-                    sys.stdout.flush()
+                # Signal turn completion: configured notify sound, else bell.
+                try:
+                    from agent.notify_sound import notify_turn_complete
+
+                    notify_turn_complete(bell=self.bell_on_complete)
+                except Exception:
+                    import logging as _logging
+
+                    _logging.getLogger(__name__).debug(
+                        "turn-complete notification failed", exc_info=True
+                    )
 
             except Exception as e:
                 # Same TUI refresh pattern as success path (#2718)
