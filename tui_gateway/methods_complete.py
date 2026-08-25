@@ -621,6 +621,68 @@ def _(rid, params: dict) -> dict:
         return _err(rid, 5035, str(e))
 
 
+@method("model.add_custom")
+def _(rid, params: dict) -> dict:
+    """Add a custom OpenAI-compatible provider to config.yaml.
+
+    Params:
+        name: display name (e.g. "My Local LLM")
+        base_url: endpoint URL (e.g. "http://localhost:11434/v1")
+        api_key: API key (optional, can be empty for local endpoints)
+        model: default model name (optional)
+
+    Returns the new provider entry and refreshed provider list.
+    """
+    try:
+        from hermes_cli.config import load_config, save_config
+
+        name = (params.get("name") or "").strip()
+        base_url = (params.get("base_url") or "").strip()
+        api_key = (params.get("api_key") or "").strip()
+        model = (params.get("model") or "").strip()
+
+        if not name:
+            return _err(rid, 4001, "name is required")
+        if not base_url:
+            return _err(rid, 4001, "base_url is required")
+
+        # Slug from name: lowercase, replace spaces/special chars with hyphens
+        import re
+        slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+
+        config = load_config()
+        custom_list = config.get("custom_providers")
+        if not isinstance(custom_list, list):
+            custom_list = []
+
+        # Check for duplicate name
+        for existing in custom_list:
+            if isinstance(existing, dict) and existing.get("name", "").lower() == name.lower():
+                return _err(rid, 4006, f"provider '{name}' already exists")
+
+        entry = {
+            "name": name,
+            "base_url": base_url,
+        }
+        if api_key:
+            entry["api_key"] = api_key
+        if model:
+            entry["model"] = model
+
+        custom_list.append(entry)
+        config["custom_providers"] = custom_list
+        save_config(config)
+
+        return _ok(rid, {
+            "slug": slug,
+            "name": name,
+            "base_url": base_url,
+            "added": True,
+        })
+    except Exception as e:
+        return _err(rid, 5036, str(e))
+
+
 def register(server) -> None:
     """Bind this module's handlers onto ``server``'s globals and registry."""
     _registry.install(server)

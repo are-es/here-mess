@@ -349,6 +349,73 @@ def _(rid, params: dict) -> dict:
         # config actually changed — a /skin or /statusbar write bumps mtime
         # but must not cost a multi-second MCP reconnect.
         return _ok(rid, {"mtime": mtime, "mcp_rev": _compute_mcp_rev()})
+    if key == "settings_snapshot":
+        # One read for the desktop Settings Config tab. API keys are NEVER
+        # included — only has_api_key booleans per auxiliary task.
+        try:
+            from hermes_cli.inventory import load_picker_context
+
+            cfg = _load_cfg()
+            compression_cfg = (
+                cfg.get("compression") if isinstance(cfg.get("compression"), dict) else {}
+            )
+            aux_raw = (
+                cfg.get("auxiliary") if isinstance(cfg.get("auxiliary"), dict) else {}
+            )
+            memory_cfg = cfg.get("memory") if isinstance(cfg.get("memory"), dict) else {}
+
+            aux_tasks = (
+                "vision", "web_extract", "compression", "skills_hub",
+                "approval", "mcp", "title_generation",
+            )
+            auxiliary: dict = {}
+            for task in aux_tasks:
+                task_cfg = (
+                    aux_raw.get(task) if isinstance(aux_raw.get(task), dict) else {}
+                )
+                auxiliary[task] = {
+                    "provider": str(task_cfg.get("provider") or "auto"),
+                    "model": str(task_cfg.get("model") or ""),
+                    "base_url": str(task_cfg.get("base_url") or ""),
+                    "has_api_key": bool(str(task_cfg.get("api_key") or "").strip()),
+                }
+
+            ctx = load_picker_context()
+            return _ok(
+                rid,
+                {
+                    "compression": {
+                        "enabled": bool(compression_cfg.get("enabled", True)),
+                        "threshold": float(
+                            compression_cfg.get("threshold", 0.50) or 0.50
+                        ),
+                        "target_ratio": float(
+                            compression_cfg.get("target_ratio", 0.20) or 0.20
+                        ),
+                        "tail_mode": str(
+                            compression_cfg.get("tail_mode") or "legacy"
+                        ),
+                        "protect_last_n": int(
+                            compression_cfg.get("protect_last_n", 20) or 0
+                        ),
+                        "progress_notices": bool(
+                            compression_cfg.get("progress_notices", False)
+                        ),
+                    },
+                    "auxiliary": auxiliary,
+                    "memory": {
+                        "memory_char_limit": int(
+                            memory_cfg.get("memory_char_limit", 2200) or 2200
+                        ),
+                        "user_char_limit": int(
+                            memory_cfg.get("user_char_limit", 1375) or 1375
+                        ),
+                    },
+                    "model": {"model": ctx.current_model, "provider": ctx.current_provider},
+                },
+            )
+        except Exception as e:
+            return _err(rid, 5061, str(e))
     return _err(rid, 4002, f"unknown config key: {key}")
 
 

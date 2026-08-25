@@ -72,3 +72,35 @@ Config: `~/.hermes/config.yaml` (settings) + `~/.hermes/.env` (SECRETS ONLY). Lo
 - Tool schema descriptions must not name tools from other toolsets — the model hallucinates calls to unavailable tools. Add cross-refs dynamically in `get_tool_definitions()`.
 - Stale `SSL_CERT_FILE` breaks auxiliary calls — self-heal lives in `agent/ssl_guard.py`.
 - `except Exception: pass` around helper calls hides `NameError` from missing imports (bit us in `plugins/codemaps/tools.py` with `IGNORED_DIRS`).
+
+## Settings Expansion (Memory / Config / Model tabs) — 2026-08-24
+- **PRD/Roadmap**: `.ares/settings_expansion/`.
+- **Model dropdown label fix** (`model-dropdown.tsx`): label precedence
+  `session.info.model → model.options top-level model → "default"`; provider
+  rows key on `slug ?? id`; active provider gets a `current` marker.
+- **Backend whitelist** (`tui_gateway/server.py`): `_SETTINGS_WHITELIST`
+  frozenset + new branch in `config.set` before the final `unknown config key`
+  error. Covers `compression.*`, `auxiliary.<task>.*`, `memory.*_char_limit`.
+  api_key writes are stored but never echoed. Constants near `_STATUSBAR_MODES`.
+- **`settings_snapshot`**: handled as a `config.get` key (methods_config.py,
+  after `mtime`). Returns compression/auxiliary/memory/model; only
+  `has_api_key` booleans, never secrets.
+- **Memory RPCs**: `tui_gateway/methods_memory.py` — `memory.list`,
+  `memory.write` (add/replace/remove via `load_on_disk_store()`, so locking +
+  drift detection apply). Registered in server.py's split-module import list.
+- **Frontend tabs**: `settings-model.tsx` (+provider auth modal; oauth shows
+  CLI hint, no fake login), `settings-config.tsx` (click-only rows),
+  `settings-memory.tsx` (per-entry cards, inline edit, two-click delete,
+  add form with remaining-bytes guard), store `store/settings-backend.ts`,
+  styles `styles/settings-extra.css` (imported from global.css).
+- **Tests**: `tests/test_gateway_settings_rpc.py` (18 tests) +
+  `settings-{model,config,memory}.test.tsx`. Vitest total 56/56.
+- **Vitest quirk**: bare `npx vitest run` fails with `React.act is not a
+  function` — production React build lacks `act`. Use
+  `NODE_ENV=development npx vitest run`.
+- **Pre-existing failures**: `tests/test_tui_gateway_server.py` has 11 fails
+  on clean HEAD too (verified twice via git stash) — NOT caused by this work.
+- **Crash lesson (2026-08-24)**: PC restart truncated ~22 tracked files to
+  0 bytes (server.py, methods_config.py, config_defaults.py, file_tools.py...).
+  Recovery = `git checkout -- <files>`; untracked work survived. After any hard
+  crash, check for empty tracked files before running anything.

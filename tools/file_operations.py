@@ -35,6 +35,7 @@ import json
 import unicodedata
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional, List, Dict, Any, ClassVar
 from pathlib import Path
 from tools.binary_extensions import BINARY_EXTENSIONS
@@ -152,6 +153,65 @@ def _has_bom(text: Optional[str]) -> bool:
 def _is_write_denied(path: str) -> bool:
     """Return True if path is on the write deny list."""
     return _shared_is_write_denied(path)
+
+
+# =============================================================================
+# Pre-write backup — mirrors each file under its own root's .trash/
+# =============================================================================
+
+ARES_TRASH_DIR_NAME = ".trash"
+
+
+def _find_root_for_path(path: str) -> Optional[str]:
+    """Walk up from ``path`` to the nearest project root.
+
+    A project root is a directory containing ``.git/`` **or** matching the
+    ``ARES_WORKSPACE_ROOT`` env var (default ``/mnt/hdd/ares-workspace``).
+    ``.git`` wins when both match at the same depth.
+
+    Returns the absolute root, or ``None`` when no root ancestor is found.
+    """
+    workspace_root = os.environ.get("ARES_WORKSPACE_ROOT", "/mnt/hdd/ares-workspace")
+    workspace_root = os.path.abspath(os.path.expanduser(workspace_root)) if workspace_root else None
+
+    d = Path(os.path.abspath(path)).parent
+    for _ in range(64):
+        if (d / ".git").exists():
+            return str(d)
+        if workspace_root and os.path.abspath(str(d)) == workspace_root:
+            return str(d)
+        parent = d.parent
+        if parent == d:
+            break
+        d = parent
+    return None
+
+
+def _workspace_trash_backup_path(path: str, timestamp: Optional[str] = None) -> Optional[str]:
+    """Where ``path``'s pre-write copy belongs, or ``None`` if it isn't archived.
+
+    Finds the nearest git root above ``path`` and mirrors the root-relative
+    path under ``<root>/.trash/``.  ``paap/src/file.py`` inside
+    ``/mnt/hdd/ares-workspace`` archives to
+    ``/mnt/hdd/ares-workspace/.trash/paap/src/file-20260825T011451.py``.
+
+    Returns ``None`` for paths already inside ``.trash/`` (no backup-of-backup)
+    and for paths with no git-root ancestor.
+    """
+    root = _find_root_for_path(path)
+    if not root:
+        return None
+    try:
+        rel = Path(os.path.abspath(path)).relative_to(root)
+    except ValueError:
+        return None
+    parts = rel.parts
+    if not parts or parts[0] == ARES_TRASH_DIR_NAME:
+        return None
+    stem, ext = os.path.splitext(rel.name)
+    ts = timestamp or datetime.now().strftime("%Y%m%dT%H%M%S.%f")
+    return str(Path(root) / ARES_TRASH_DIR_NAME / rel.parent / f"{stem}-{ts}{ext}")
+
 
 
 # =============================================================================
@@ -1173,6 +1233,60 @@ class ShellFileOperations(FileOperations):
             arg = _msys_to_windows_path(arg).replace("\\", "/")
         return "'" + arg.replace("'", "'\"'\"'") + "'"
 
+    def _backup_to_trash(self, path: str) -> Optional[str]:
+        """Back up an existing file to ``<root>/.trash/`` before overwrite.
+
+        Finds the project root via ``_find_root_for_path`` (nearest ``.git/``
+        or ``ARES_WORKSPACE_ROOT``) and mirrors the root-relative path under
+        ``<root>/.trash/``.  Each overwrite gets its own timestamped copy so
+        every version is recoverable.
+
+        Returns ``None`` on success or when backup is not needed (file is new,
+        outside any known root, or already inside .trash).
+        """
+        root = _find_root_for_path(path)
+        if not root:
+            return None
+
+        # Must be an existing file (not new)
+        check_cmd = f"test -f {self._escape_shell_arg(path)}"
+        check_result = self._exec(check_cmd)
+        if check_result.exit_code != 0:
+            return None
+
+        # Compute relative path from root
+        try:
+            resolved_path = os.path.realpath(path)
+            resolved_root = os.path.realpath(root)
+            rel_path = os.path.relpath(resolved_path, resolved_root)
+        except (OSError, ValueError):
+            return None
+
+        # Skip if already inside .trash
+        parts = Path(rel_path).parts
+        if not parts or parts[0] == ".trash":
+            return None
+
+        rel_dir = os.path.dirname(rel_path)
+        stem = os.path.splitext(os.path.basename(rel_path))[0]
+        ext = os.path.splitext(rel_path)[1]
+
+        ts = datetime.now().strftime("%Y%m%dT%H%M%S.%f")
+        backup_name = f"{stem}-{ts}{ext}"
+        trash_dir = os.path.join(resolved_root, ".trash")
+        backup_dir = os.path.join(trash_dir, rel_dir)
+        backup_path = os.path.join(backup_dir, backup_name)
+
+        script = (
+            f"mkdir -p {self._escape_shell_arg(backup_dir)} && "
+            f"cp -p {self._escape_shell_arg(path)} {self._escape_shell_arg(backup_path)}"
+        )
+        result = self._exec(script)
+        if result.exit_code != 0:
+            return f"Failed to back up {path} to .trash: {result.stdout}"
+
+        return None
+
     def _atomic_write(self, path: str, content: str) -> "ExecuteResult":
         """Write ``content`` to ``path`` atomically via temp-file + rename.
 
@@ -2117,6 +2231,12 @@ class ShellFileOperations(FileOperations):
                     "UTF-8. The file was NOT created or modified."
                 )
             )
+
+        # Back up existing file to .trash before overwriting
+        backup_err = self._backup_to_trash(path)
+        if backup_err:
+            return WriteResult(error=backup_err)
+
         write_result = self._atomic_write(path, content)
 
         if write_result.exit_code != 0:

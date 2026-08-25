@@ -4469,6 +4469,30 @@ def _write_config_key(key_path: str, value):
 _STATUSBAR_MODES = frozenset({"off", "top", "bottom"})
 _APPROVAL_MODES = frozenset({"manual", "smart", "off"})
 
+# Curated dotted-key whitelist for desktop Settings → Config. Anything
+# outside this set still falls through to `unknown config key` — the
+# renderer never gets arbitrary config-path write access.
+_SETTINGS_WHITELIST = frozenset(
+    {
+        *(f"compression.{k}" for k in (
+            "enabled", "threshold", "target_ratio", "tail_mode",
+            "protect_last_n", "progress_notices",
+        )),
+        *(f"auxiliary.{t}.{f}" for t in (
+            "vision", "web_extract", "compression", "skills_hub",
+            "approval", "mcp", "title_generation",
+        ) for f in ("provider", "model", "base_url", "api_key")),
+        "memory.memory_char_limit",
+        "memory.user_char_limit",
+    }
+)
+_COMPRESSION_TAIL_MODES = frozenset({"legacy", "lean"})
+_AUX_TASKS = frozenset({
+    "vision", "web_extract", "compression", "skills_hub",
+    "approval", "mcp", "title_generation",
+})
+_AUX_FIELDS = frozenset({"provider", "model", "base_url", "api_key"})
+
 
 def _load_approval_mode() -> str:
     """Resolve the effective ``approvals.mode`` for the TUI surface.
@@ -12697,6 +12721,64 @@ def _(rid, params: dict) -> dict:
         except Exception as e:
             return _err(rid, 5001, str(e))
 
+    if key in _SETTINGS_WHITELIST:
+        # Curated dotted-key writes for the desktop Settings Config tab.
+        # Everything is validated here and persisted through the shared
+        # _write_config_key helper — the renderer never gets arbitrary
+        # config-path write access. API keys are stored but never echoed.
+        try:
+            section, sub = key.split(".", 1)
+            raw = value
+
+            if section == "compression":
+                if sub in {"enabled", "progress_notices"}:
+                    nv_b = bool(raw) if isinstance(raw, bool) else str(raw).strip().lower() in {"true", "on", "1", "yes"}
+                    _write_config_key(f"compression.{sub}", nv_b)
+                    return _ok(rid, {"key": key, "value": nv_b})
+                if sub in {"threshold", "target_ratio"}:
+                    fv = float(raw)
+                    lo, hi = (0.10, 0.95) if sub == "threshold" else (0.05, 0.60)
+                    if not lo <= fv <= hi:
+                        return _err(rid, 4002, f"{key} must be between {lo} and {hi}")
+                    _write_config_key(f"compression.{sub}", fv)
+                    return _ok(rid, {"key": key, "value": fv})
+                if sub == "tail_mode":
+                    sv = str(raw or "").strip().lower()
+                    if sv not in _COMPRESSION_TAIL_MODES:
+                        return _err(rid, 4002, f"unknown tail_mode: {raw}")
+                    _write_config_key("compression.tail_mode", sv)
+                    return _ok(rid, {"key": key, "value": sv})
+                if sub == "protect_last_n":
+                    iv = max(0, int(raw))
+                    _write_config_key("compression.protect_last_n", iv)
+                    return _ok(rid, {"key": key, "value": iv})
+                return _err(rid, 4002, f"unknown config key: {key}")
+
+            if section == "auxiliary":
+                task, field = sub.split(".", 1)
+                if task not in _AUX_TASKS or field not in _AUX_FIELDS:
+                    return _err(rid, 4002, f"unknown config key: {key}")
+                sv = str(raw or "").strip()
+                _write_config_key(f"auxiliary.{task}.{field}", sv)
+                if field == "api_key":
+                    # Never echo credential values back over RPC.
+                    return _ok(rid, {"key": key, "value": "", "stored": bool(sv)})
+                return _ok(rid, {"key": key, "value": sv})
+
+            if section == "memory":
+                iv = int(raw)
+                limits = {
+                    "memory_char_limit": (500, 40000),
+                    "user_char_limit": (300, 20000),
+                }
+                lo, hi = limits[sub]
+                if not lo <= iv <= hi:
+                    return _err(rid, 4002, f"{key} must be between {lo} and {hi}")
+                _write_config_key(f"memory.{sub}", iv)
+                return _ok(rid, {"key": key, "value": iv})
+        except (TypeError, ValueError):
+            return _err(rid, 4002, f"invalid value for {key}: {value!r}")
+
     return _err(rid, 4002, f"unknown config key: {key}")
 
 
@@ -15684,6 +15766,7 @@ from . import (  # noqa: E402
     methods_complete as _methods_complete,
     methods_config as _methods_config,
     methods_images as _methods_images,
+    methods_memory as _methods_memory,
     methods_profiles as _methods_profiles,
     methods_prompt as _methods_prompt,
     methods_session as _methods_session,
@@ -15697,6 +15780,7 @@ for _m in (
     _methods_complete,
     _methods_tools,
     _methods_profiles,
+    _methods_memory,
     _methods_images,
 ):
     _m.register(sys.modules[__name__])

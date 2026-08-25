@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARES Desktop — Boot Animation Preview (6 Options)</title>
+  <style>
+    :root {
+      --bg: #07080b;
+      --bg-card: #0e1118;
+      --fg-primary: #f0f3f6;
+      --fg-secondary: #9aa3af;
+      --fg-muted: #4b5563;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.5);
+      --accent-cyan: #06b6d4;
+      --accent-amber: #f59e0b;
+      --accent-emerald: #10b981;
+      --border: rgba(255, 255, 255, 0.08);
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #040507;
+      color: var(--fg-primary);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top Control Bar */
+    .preview-header {
+      background: #0b0d13;
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .preview-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .preview-brand h1 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .preview-brand span {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    .preview-tabs {
+      display: flex;
+      gap: 4px;
+      background: #06070a;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--fg-secondary);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: var(--fg-primary);
+    }
+
+    .tab-btn.active {
+      background: var(--bg-card);
+      color: var(--fg-primary);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .stage-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 20px;
+      position: relative;
+    }
+
+    .viewport-frame {
+      width: 820px;
+      height: 540px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .viewport-screen {
+      flex: 1;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      position: relative;
+      padding: 30px;
+    }
+
+    .viewport-screen.active {
+      display: flex;
+    }
+
+    /* Interactive Phase Simulator */
+    .interactive-bar {
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .phase-btn {
+      background: #11141d;
+      border: 1px solid var(--border);
+      color: var(--fg-secondary);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .phase-btn:hover {
+      border-color: var(--accent);
+      color: var(--fg-primary);
+    }
+
+    /* ========================================================= */
+    /* OPTION 1: TACTICAL RADAR PULSE                            */
+    /* ========================================================= */
+    .opt1-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 2;
+    }
+
+    .opt1-radar-wrapper {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .opt1-ring-1, .opt1-ring-2 {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid var(--accent);
+      pointer-events: none;
+    }
+
+    .opt1-ring-1 {
+      width: 100%;
+      height: 100%;
+      opacity: 0.3;
+      animation: radar-pulse 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+    }
+
+    .opt1-ring-2 {
+      width: 125%;
+      height: 125%;
+      border-style: dashed;
+      border-color: var(--accent-cyan);
+      opacity: 0.15;
+      animation: radar-spin 12s linear infinite;
+    }
+
+    .opt1-logo {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 16px var(--accent-glow));
+      animation: logo-breathe 2.4s ease-in-out infinite alternate;
+      z-index: 5;
+    }
+
+    .opt1-scanline {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+      opacity: 0.7;
+      animation: scan-vertical 2.2s ease-in-out infinite;
+      z-index: 6;
+    }
+
+    .opt1-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .opt1-title .badge {
+      font-size: 9px;
+      background: #1e293b;
+      color: var(--accent-cyan);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      font-family: var(--font-mono);
+      font-weight: 500;
+    }
+
+    .opt1-phase {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--fg-secondary);
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .opt1-phase-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 8px var(--accent-cyan);
+      animation: blink 1s ease infinite;
+    }
+
+    .opt1-progress-bar {
+      width: 220px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .opt1-progress-fill {
+      height: 100%;
+      width: 60%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-cyan));
+      border-radius: 3px;
+      position: absolute;
+      animation: progress-slide 1.8s ease-in-out infinite;
+    }
+
+    .opt1-grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+    }
+
+    /* ========================================================= */
+    /* OPTION 2: SLEEK MINIMAL GLOW                           */
+    /* ========================================================= */
+    .opt2-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 2;
+    }
+
+    .opt2-logo-box {
+      width: 90px;
+      height: 90px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .opt2-logo {
+      width: 76px;
+      height: 76px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 20px rgba(255, 255, 255, 0.2));
+      animation: mono-float 3s ease-in-out infinite alternate;
+    }
+
+    .opt2-backdrop-glow {
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .opt2-title {
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .opt2-phase {
+      font-size: 12px;
+      color: var(--fg-muted);
+      margin-bottom: 20px;
+      font-weight: 400;
+    }
+
+    .opt2-bar {
+      width: 160px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.06);
+      position: relative;
+      overflow: hidden;
+      border-radius: 2px;
+    }
+
+    .opt2-bar-glow {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 40px;
+      background: #ffffff;
+      box-shadow: 0 0 10px #ffffff;
+      animation: mono-bar 1.5s ease-in-out infinite;
+    }
+
+    /* ========================================================= */
+    /* OPTION 3: TERMINAL BIOS / SYSTEM READOUT                  */
+    /* ========================================================= */
+    .opt3-container {
+      width: 520px;
+      background: #090b10;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 20px 24px;
+      font-family: var(--font-mono);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7);
+    }
+
+    .opt3-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    .opt3-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .opt3-logo {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+    }
+
+    .opt3-sysname {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .opt3-status-tag {
+      font-size: 10px;
+      color: #10b981;
+      background: rgba(16, 185, 129, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .opt3-logs {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--fg-secondary);
+    }
+
+    .opt3-log-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .opt3-ok {
+      color: #10b981;
+      font-weight: 700;
+    }
+
+    .opt3-active-row {
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .opt3-spinner {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border: 1.5px solid var(--accent-cyan);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* ========================================================= */
+    /* OPTION 4: SPECTRUM BEAM & SPECTRUM TICK METERS (CYBERNETIC) */
+    /* ========================================================= */
+    .opt4-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      width: 100%;
+    }
+
+    .opt4-frame {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 36px;
+      margin-bottom: 24px;
+    }
+
+    .opt4-meter {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .opt4-meter-bar {
+      width: 16px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 1px;
+      transition: background 0.2s;
+    }
+
+    .opt4-meter-bar.active {
+      background: var(--accent-cyan);
+      box-shadow: 0 0 6px var(--accent-cyan);
+    }
+
+    .opt4-center {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .opt4-logo {
+      width: 84px;
+      height: 84px;
+      object-fit: contain;
+      z-index: 3;
+    }
+
+    /* Horizontal Spectrum Beam crossing through center */
+    .opt4-beam {
+      position: absolute;
+      top: 50%;
+      left: -120px;
+      right: -120px;
+      height: 1px;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(59, 130, 246, 0.8) 25%, 
+        #06b6d4 50%, 
+        rgba(59, 130, 246, 0.8) 75%, 
+        transparent 100%
+      );
+      box-shadow: 0 0 12px var(--accent-cyan);
+      transform: translateY(-50%);
+      pointer-events: none;
+      animation: beam-breathe 2s ease-in-out infinite;
+    }
+
+    .opt4-label {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: #fff;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .opt4-phase {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-cyan);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ========================================================= */
+    /* OPTION 5: CAD / BLUEPRINT SCHEMATIC CROSSHAIRS            */
+    /* ========================================================= */
+    .opt5-container {
+      width: 580px;
+      height: 380px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      font-family: var(--font-mono);
+      background: radial-gradient(circle at center, #0c101a 0%, #06080c 100%);
+    }
+
+    /* Crosshair markers in 4 corners */
+    .opt5-cross {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      pointer-events: none;
+    }
+    .opt5-cross::before, .opt5-cross::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .opt5-cross::before { top: 4px; left: 0; right: 0; height: 1px; }
+    .opt5-cross::after { left: 4px; top: 0; bottom: 0; width: 1px; }
+    .opt5-c-tl { top: 8px; left: 8px; }
+    .opt5-c-tr { top: 8px; right: 8px; }
+    .opt5-c-bl { bottom: 8px; left: 8px; }
+    .opt5-c-br { bottom: 8px; right: 8px; }
+
+    .opt5-top-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: var(--fg-muted);
+    }
+
+    .opt5-center-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .opt5-reticle {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .opt5-reticle-box {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      animation: reticle-rot 8s linear infinite;
+    }
+
+    .opt5-logo {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+    }
+
+    .opt5-sys-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 2px;
+    }
+
+    .opt5-bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 12px;
+      font-size: 11px;
+    }
+
+    .opt5-phase-text {
+      color: var(--accent-amber);
+    }
+
+    /* ========================================================= */
+    /* OPTION 6: SEGMENTED APERTURE CORE LOCK                    */
+    /* ========================================================= */
+    .opt6-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 2;
+    }
+
+    .opt6-aperture {
+      position: relative;
+      width: 130px;
+      height: 130px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .opt6-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 2px solid transparent;
+      border-top-color: var(--accent);
+      border-bottom-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: aperture-spin 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    .opt6-inner-ring {
+      position: absolute;
+      width: 80%;
+      height: 80%;
+      border: 1px dashed rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      animation: aperture-spin-rev 4s linear infinite;
+    }
+
+    .opt6-logo {
+      width: 70px;
+      height: 70px;
+      object-fit: contain;
+      filter: drop-shadow(0 0 20px var(--accent-glow));
+    }
+
+    .opt6-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .opt6-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #0f172a;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-cyan);
+      margin-bottom: 16px;
+    }
+
+    .opt6-pulse-point {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      animation: blink 1s infinite;
+    }
+
+    /* Keyframes */
+    @keyframes radar-pulse {
+      0% { transform: scale(0.9); opacity: 0.4; }
+      50% { transform: scale(1.15); opacity: 0.1; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+    @keyframes radar-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes logo-breathe { 0% { transform: scale(0.97); } 100% { transform: scale(1.03); filter: drop-shadow(0 0 24px var(--accent)); } }
+    @keyframes scan-vertical { 0% { top: 10%; opacity: 0; } 20% { opacity: 0.8; } 80% { opacity: 0.8; } 100% { top: 90%; opacity: 0; } }
+    @keyframes progress-slide { 0% { left: -40%; width: 30%; } 50% { left: 30%; width: 50%; } 100% { left: 100%; width: 20%; } }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    @keyframes mono-float { 0% { transform: translateY(0); } 100% { transform: translateY(-4px); } }
+    @keyframes mono-bar { 0% { left: -30%; } 100% { left: 100%; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes beam-breathe { 0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 6px var(--accent)); } 50% { opacity: 1; filter: drop-shadow(0 0 16px var(--accent-cyan)); } }
+    @keyframes reticle-rot { from { transform: rotate(0deg); } to { transform: rotate(90deg); } }
+    @keyframes aperture-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes aperture-spin-rev { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+  </style>
+</head>
+<body>
+
+  <header class="preview-header">
+    <div class="preview-brand">
+      <h1>ARES Boot Screen</h1>
+      <span>6 Interactive Themes</span>
+    </div>
+
+    <div class="preview-tabs">
+      <button class="tab-btn active" onclick="switchTab(1)">1. Radar Pulse</button>
+      <button class="tab-btn" onclick="switchTab(2)">2. Minimal Glow</button>
+      <button class="tab-btn" onclick="switchTab(3)">3. Terminal BIOS</button>
+      <button class="tab-btn" onclick="switchTab(4)">4. Spectrum Beam</button>
+      <button class="tab-btn" onclick="switchTab(5)">5. Blueprint CAD</button>
+      <button class="tab-btn" onclick="switchTab(6)">6. Aperture Core</button>
+    </div>
+  </header>
+
+  <main class="stage-container">
+    <div class="viewport-frame">
+
+      <!-- OPTION 1: TACTICAL RADAR PULSE -->
+      <div id="screen-1" class="viewport-screen active">
+        <div class="opt1-grid"></div>
+        <div class="opt1-container">
+          <div class="opt1-radar-wrapper">
+            <div class="opt1-ring-1"></div>
+            <div class="opt1-ring-2"></div>
+            <div class="opt1-scanline"></div>
+            <img class="opt1-logo" src="/mnt/hdd/ares-workspace/ares-assets/ares-blackwhite.png" alt="Ares Logo" onerror="this.src='/mnt/hdd/ares-workspace/ares-assets/ares2d.svg'">
+          </div>
+
+          <div class="opt1-title">
+            <span>ARES</span>
+            <span class="badge">v0.0.1</span>
+          </div>
+
+          <div class="opt1-phase">
+            <span class="opt1-phase-dot"></span>
+            <span id="opt1-phase-text">Starting Hermes backend...</span>
+          </div>
+
+          <div class="opt1-progress-bar">
+            <div class="opt1-progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTION 2: SLEEK MINIMAL GLOW -->
+      <div id="screen-2" class="viewport-screen">
+        <div class="opt2-container">
+          <div class="opt2-logo-box">
+            <div class="opt2-backdrop-glow"></div>
+            <img class="opt2-logo" src="/mnt/hdd/ares-workspace/ares-assets/ares-blackwhite.png" alt="Ares Logo" onerror="this.src='/mnt/hdd/ares-workspace/ares-assets/ares2d.svg'">
+          </div>
+
+          <div class="opt2-title">Hermes Desktop</div>
+          <div id="opt2-phase-text" class="opt2-phase">Initializing workspace...</div>
+
+          <div class="opt2-bar">
+            <div class="opt2-bar-glow"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTION 3: TERMINAL BIOS -->
+      <div id="screen-3" class="viewport-screen">
+        <div class="opt3-container">
+          <div class="opt3-header">
+            <div class="opt3-brand">
+              <img class="opt3-logo" src="/mnt/hdd/ares-workspace/ares-assets/ares-blackwhite.png" alt="Ares" onerror="this.src='/mnt/hdd/ares-workspace/ares-assets/ares2d.svg'">
+              <span class="opt3-sysname">ARES CORE BOOTLOADER</span>
+            </div>
+            <span class="opt3-status-tag">SYSTEM BOOT</span>
+          </div>
+
+          <div class="opt3-logs">
+            <div class="opt3-log-row">
+              <span class="opt3-ok">[OK]</span>
+              <span>Resolve binary: /home/dolvin/.local/bin/hermes</span>
+            </div>
+            <div class="opt3-log-row">
+              <span class="opt3-ok">[OK]</span>
+              <span>Spawn backend process (PID 36721)</span>
+            </div>
+            <div class="opt3-log-row">
+              <span class="opt3-ok">[OK]</span>
+              <span>Sentinel detected: port=35121</span>
+            </div>
+            <div class="opt3-active-row">
+              <span class="opt3-spinner"></span>
+              <span id="opt3-phase-text">Checking HTTP status & WS handshake...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTION 4: SPECTRUM BEAM -->
+      <div id="screen-4" class="viewport-screen">
+        <div class="opt4-container">
+          <div class="opt4-frame">
+            <div class="opt4-meter">
+              <div class="opt4-meter-bar active"></div>
+              <div class="opt4-meter-bar active"></div>
+              <div class="opt4-meter-bar active"></div>
+              <div class="opt4-meter-bar"></div>
+              <div class="opt4-meter-bar"></div>
+            </div>
+
+            <div class="opt4-center">
+              <div class="opt4-beam"></div>
+              <img class="opt4-logo" src="/mnt/hdd/ares-workspace/ares-assets/ares-blackwhite.png" alt="Ares" onerror="this.src='/mnt/hdd/ares-workspace/ares-assets/ares2d.svg'">
+            </div>
+
+            <div class="opt4-meter">
+              <div class="opt4-meter-bar active"></div>
+              <div class="opt4-meter-bar active"></div>
+              <div class="opt4-meter-bar"></div>
+              <div class="opt4-meter-bar"></div>
+              <div class="opt4-meter-bar"></div>
+            </div>
+          </div>
+
+          <div class="opt4-label">ARES CORE ENGINE</div>
+          <div class="opt4-phase">
+            <span style="display:inline-block; width:6px; height:6px; background:#06b6d4; border-radius:50%;"></span>
+            <span id="opt4-phase-text">Connecting to gateway socket (port 35121)...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTION 5: BLUEPRINT CAD -->
+      <div id="screen-5" class="viewport-screen">
+        <div class="opt5-container">
+          <div class="opt5-cross opt5-c-tl"></div>
+          <div class="opt5-cross opt5-c-tr"></div>
+          <div class="opt5-cross opt5-c-bl"></div>
+          <div class="opt5-cross opt5-c-br"></div>
+
+          <div class="opt5-top-meta">
+            <span>[SCHEMATIC: ARES-DESKTOP-v0.0.1]</span>
+            <span>GRID: 1200x800 LINUX-X11</span>
+          </div>
+
+          <div class="opt5-center-view">
+            <div class="opt5-reticle">
+              <div class="opt5-reticle-box"></div>
+              <img class="opt5-logo" src="/mnt/hdd/ares-workspace/ares-assets/ares-blackwhite.png" alt="Ares" onerror="this.src='/mnt/hdd/ares-workspace/ares-assets/ares2d.svg'">
+            </div>
+            <div class="opt5-sys-title">SYSTEM INITIALIZATION</div>
+          </div>
+
+          <div class="opt5-bottom-bar">
+            <span>TARGET: /mnt/hdd/ares-workspace</span>
+            <span id="opt5-phase-text" class="opt5-phase-text">> SPAWNING LOCAL SUPERVISOR...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTION 6: APERTURE CORE -->
+      <div id="screen-6" class="viewport-screen">
+        <div class="opt6-container">
+          <div class="opt6-aperture">
+            <div class="opt6-ring"></div>
+            <div class="opt6-inner-ring"></div>
+            <img class="opt6-logo" src="/mnt/hdd/ares-workspace/ares-assets/ares-blackwhite.png" alt="Ares" onerror="this.src='/mnt/hdd/ares-workspace/ares-assets/ares2d.svg'">
+          </div>
+
+          <div class="opt6-title">A R E S</div>
+          <div class="opt6-status-badge">
+            <span class="opt6-pulse-point"></span>
+            <span id="opt6-phase-text">ARMING WORKSPACE ENGINE...</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="interactive-bar">
+    <span style="font-size: 11px; color: var(--fg-muted); font-family: var(--font-mono);">Simulate Phase:</span>
+    <button class="phase-btn" onclick="setPhase('resolve')">1. Resolve</button>
+    <button class="phase-btn" onclick="setPhase('spawn')">2. Spawn</button>
+    <button class="phase-btn" onclick="setPhase('wait_ready')">3. Bind Port</button>
+    <button class="phase-btn" onclick="setPhase('gateway')">4. Gateway WS</button>
+    <button class="phase-btn" onclick="setPhase('ready')">5. Ready</button>
+  </div>
+
+  <script>
+    function switchTab(num) {
+      document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === (num - 1));
+      });
+      document.querySelectorAll('.viewport-screen').forEach((screen, idx) => {
+        screen.classList.toggle('active', idx === (num - 1));
+      });
+    }
+
+    const phases = {
+      resolve: 'Looking for Hermes binary...',
+      spawn: 'Starting Hermes backend...',
+      wait_ready: 'Waiting for backend to bind port...',
+      gateway: 'Connecting to gateway socket (port 35121)...',
+      ready: 'Backend online. Workspace ready.'
+    };
+
+    function setPhase(key) {
+      const text = phases[key] || 'Working...';
+      for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById(`opt${i}-phase-text`);
+        if (el) el.innerText = (i === 5 ? `> ${text.toUpperCase()}` : text);
+      }
+    }
+  </script>
+</body>
+</html>
