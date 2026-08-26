@@ -4347,6 +4347,8 @@ class PluginManager:
         for child in sorted(path.iterdir()):
             if not child.is_dir():
                 continue
+            if child.name.startswith("."):
+                continue
             if depth == 0 and skip_names and child.name in skip_names:
                 continue
             manifest_file = child / "plugin.yaml"

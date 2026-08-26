@@ -2134,52 +2134,20 @@ def _build_skills_system_prompt_inner(
             except Exception as e:
                 logger.debug("Could not read external skill description %s: %s", desc_file, e)
 
-    # Posture-driven category demotion (e.g. non-coding skills while pairing
-    # on code). Demoted categories stay in the index as a single names-only
-    # line — descriptions are dropped to cut noise, but every skill name
-    # remains visible so memory-anchored recall ("load <name>") keeps working.
-    # NEVER remove entries entirely: agent-created skills are the model's
-    # project memory, and models don't reach for skills_list to rediscover
-    # what the index stops showing them. Match on the top-level category
-    # segment so nested categories ("social-media/twitter") are demoted with
-    # their parent.
-    demoted = frozenset(
-        cat for cat in skills_by_category
-        if cat.split("/", 1)[0] in (compact_categories or frozenset())
-    )
-
-    hidden_note = ""
-    if demoted:
-        hidden_note = (
-            "\n(Categories marked [names only] are outside the current coding "
-            "context, so their descriptions are omitted — the skills work "
-            "normally and load with skill_view(name) as usual.)"
-        )
+    # Names-only index for every category (see loop below). Descriptions are
+    # dropped to cut noise; every skill name remains visible so
+    # memory-anchored recall ("load <name>") keeps working, and
+    # skills_list()/skill_view(name) still expose full descriptions on demand.
 
     if not skills_by_category:
         result = ""
     else:
         index_lines = []
         for category in sorted(skills_by_category.keys()):
-            # Deduplicate and sort skills within each category
-            seen = set()
-            if category in demoted:
-                names = sorted({name for name, _ in skills_by_category[category]})
-                index_lines.append(f"  {category} [names only]: {', '.join(names)}")
-                continue
-            cat_desc = category_descriptions.get(category, "")
-            if cat_desc:
-                index_lines.append(f"  {category}: {cat_desc}")
-            else:
-                index_lines.append(f"  {category}:")
-            for name, desc in sorted(skills_by_category[category], key=lambda x: x[0]):
-                if name in seen:
-                    continue
-                seen.add(name)
-                if desc:
-                    index_lines.append(f"    - {name}: {desc}")
-                else:
-                    index_lines.append(f"    - {name}")
+            # Names-only index: descriptions are skipped to keep the
+            # always-on prompt lean; skill_view(name) loads full content.
+            names = sorted({name for name, _ in skills_by_category[category]})
+            index_lines.append(f"  {category}: {', '.join(names)}")
 
         result = (
             "## Skills (mandatory)\n"
@@ -2208,7 +2176,6 @@ def _build_skills_system_prompt_inner(
             "</available_skills>\n"
             "\n"
             "Only proceed without loading a skill if genuinely none are relevant to the task."
-            + hidden_note
         )
 
     # ── Store in LRU cache ────────────────────────────────────────────

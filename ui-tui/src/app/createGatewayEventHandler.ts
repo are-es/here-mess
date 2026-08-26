@@ -1436,12 +1436,31 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
           const ui = getUiState()
 
           if (bellOnComplete || ui.notifySound || ui.notifyPopup) {
-            notifyTurnComplete({
-              bellOnComplete,
-              notifyPopup: ui.notifyPopup,
-              notifySound: ui.notifySound,
-              stdout
-            })
+            // Defer the cue until after Ink commits the transcript. The final
+            // message's markdown parse + syntax highlight + Yoga layout run
+            // synchronously on this commit and can take 1-2s; firing the
+            // sound/popup first makes the notification beat the visible
+            // response, which reads as a freeze. requestIdleCallback (with a
+            // setTimeout floor for terminals where idle callbacks starve)
+            // runs the cue only once the paint has landed.
+            const cue = (): void => {
+              notifyTurnComplete({
+                bellOnComplete,
+                notifyPopup: ui.notifyPopup,
+                notifySound: ui.notifySound,
+                stdout
+              })
+            }
+
+            const ric = (globalThis as {
+              requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void
+            }).requestIdleCallback
+
+            if (typeof ric === 'function') {
+              ric(cue, { timeout: 500 })
+            } else {
+              setTimeout(cue, 150)
+            }
           }
         }
 

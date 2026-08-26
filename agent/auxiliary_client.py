@@ -86,24 +86,28 @@ def _load_openai_cls() -> type:
     global _OPENAI_CLS_CACHE
     if _OPENAI_CLS_CACHE is None:
         try:
-            from openai import OpenAI as _cls
+            from openai._client import OpenAI as _cls
             _OPENAI_CLS_CACHE = _cls
-        except ModuleNotFoundError:
-            # Fallback: probe virtual environment site-packages if running outside venv
-            import sys
-            from pathlib import Path
-            venv_candidates = [
-                Path(__file__).resolve().parent.parent / ".venv" / "lib",
-                Path("/home/dolvin/here-mess/.venv/lib"),
-                Path("/mnt/hdd/venv/lib"),
-            ]
-            for venv_lib in venv_candidates:
-                if venv_lib.is_dir():
-                    for sp in venv_lib.glob("python*/site-packages"):
-                        if sp.is_dir() and str(sp) not in sys.path:
-                            sys.path.insert(0, str(sp))
-            from openai import OpenAI as _cls
-            _OPENAI_CLS_CACHE = _cls
+        except Exception:
+            try:
+                from openai import OpenAI as _cls
+                _OPENAI_CLS_CACHE = _cls
+            except ModuleNotFoundError:
+                # Fallback: probe virtual environment site-packages if running outside venv
+                import sys
+                from pathlib import Path
+                venv_candidates = [
+                    Path(__file__).resolve().parent.parent / ".venv" / "lib",
+                    Path("/home/dolvin/here-mess/.venv/lib"),
+                    Path("/mnt/hdd/venv/lib"),
+                ]
+                for venv_lib in venv_candidates:
+                    if venv_lib.is_dir():
+                        for sp in venv_lib.glob("python*/site-packages"):
+                            if sp.is_dir() and str(sp) not in sys.path:
+                                sys.path.insert(0, str(sp))
+                from openai import OpenAI as _cls
+                _OPENAI_CLS_CACHE = _cls
     return _OPENAI_CLS_CACHE
 
 

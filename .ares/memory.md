@@ -104,3 +104,14 @@ Config: `~/.hermes/config.yaml` (settings) + `~/.hermes/.env` (SECRETS ONLY). Lo
   0 bytes (server.py, methods_config.py, config_defaults.py, file_tools.py...).
   Recovery = `git checkout -- <files>`; untracked work survived. After any hard
   crash, check for empty tracked files before running anything.
+
+## TUI notify-vs-render race fix (2026-08-26)
+- Symptom: turn-completion popup/sound fired before Ink committed the final
+  transcript, so the notification appeared 1-2s before the visible response
+  ("frozen" feel). Root cause: `message.complete` handler spawned the cue
+  synchronously; the final-message markdown parse + syntax highlight + Yoga
+  layout block that same commit.
+- Fix: `ui-tui/src/app/createGatewayEventHandler.ts` (~line 1438) defers
+  `notifyTurnComplete` via `requestIdleCallback` (timeout 500ms), fallback
+  `setTimeout(cue, 150)`. Verified: typecheck, notifySound vitest 19/19,
+  build. Fork-only change — protect during rebase.

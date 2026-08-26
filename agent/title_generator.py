@@ -150,6 +150,13 @@ _MACHINE_PREFIXES = (
     # actual question. Keep in sync with
     # tui_gateway.server._MODEL_SWITCH_MARKER_PREFIX.
     "[System: The active model for this chat has changed to ",
+    # Mode-instruction injections (PLAN/BUILD etc.) persist under role="user"
+    # before the user's real opening message. Titling one of these names the
+    # session after scaffolding — the model falls back to its anti-greeting
+    # placeholder ("New Workspace Session") because there is no actual intent
+    # in the text. Deliberately narrower than a bare "[System:" so personal
+    # notes the user writes themselves still title.
+    "[System: Current interaction mode:",
 )
 
 
